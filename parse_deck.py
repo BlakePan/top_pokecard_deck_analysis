@@ -49,6 +49,8 @@ def parse_deck(deck_code: str):
             elif "エネルギー" in e.text:
                 energy_dict = res
 
+    driver.close()
+    
     return pokemon_dict, tool_dict, supporter_dict, stage_dict, energy_dict
 
 
