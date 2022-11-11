@@ -26,6 +26,8 @@ def parse_deck(deck_code: str = None, deck_link: str = None):
 
     url = deck_link if deck_link else f"https://www.pokemon-card.com/deck/confirm.html/deckID/{deck_code}/"
     driver = webdriver.Chrome(options=chrome_options)
+    driver.implicitly_wait(10) # seconds
+
     driver.get(url)
     driver.find_element(By.ID, "deckView01").click()  # Click リスト表示 
     elems = driver.find_elements(By.CLASS_NAME, "Grid_item")
@@ -37,20 +39,35 @@ def parse_deck(deck_code: str = None, deck_link: str = None):
     energy_dict = {}
 
     for e in elems:
-        if "ポケモン" in e.text:
+        if "ポケモン (" in e.text:
+            """
+            example:
+
+            ポケモン (11)
+            ジュラルドンVMAX
+            S8b
+            253/184
+            3枚
+            """
             cards = e.text.split('\n')
             for i in range(1, len(cards), 4):
                 pokemon_dict[cards[i]] = cards[i+3][:-1]
         else:
+            """
+            example:
+
+            グッズ (19)
+            クイックボール 3枚
+            """
             cards = e.text.split('\n')
             res = extract_card(cards)
-            if "グッズ" in e.text:
+            if "グッズ (" in e.text:
                 tool_dict = res
-            elif "サポート" in e.text:
+            elif "サポート (" in e.text:
                 supporter_dict = res
-            elif "スタジアム" in e.text:
+            elif "スタジアム (" in e.text:
                 stage_dict = res
-            elif "エネルギー" in e.text:
+            elif "エネルギー (" in e.text:
                 energy_dict = res
 
     driver.close()
@@ -67,8 +84,9 @@ if __name__ == "__main__":
     print("supporter_dict"); print(supporter_dict)
     print("stage_dict"); print(stage_dict)
     print("energy_dict"); print(energy_dict)
-    
-    parse_deck(deck_link = "https://www.pokemon-card.com/deck/confirm.html/deckID/kV1kvF-A9aA3G-Vw5FV1")
+
+    pokemon_dict, tool_dict, supporter_dict, stage_dict, energy_dict = \
+    parse_deck(deck_link = "https://www.pokemon-card.com/deck/confirm.html/deckID/NnngQg-WZuTqi-giLn9L")
     print("--- use deck link")
     print("pokemon_dict"); print(pokemon_dict)
     print("tool_dict"); print(tool_dict)
