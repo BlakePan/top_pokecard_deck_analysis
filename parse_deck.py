@@ -20,9 +20,13 @@ def extract_card(cards):
     return _dict
 
 
-def parse_deck(deck_code: str):
+def parse_deck(deck_code: str = None, deck_link: str = None):
+    if not deck_code and not deck_link:
+        return
+
+    url = deck_link if deck_link else f"https://www.pokemon-card.com/deck/confirm.html/deckID/{deck_code}/"
     driver = webdriver.Chrome(options=chrome_options)
-    driver.get(f"https://www.pokemon-card.com/deck/confirm.html/deckID/{deck_code}/")
+    driver.get(url)
     driver.find_element(By.ID, "deckView01").click()  # Click リスト表示 
     elems = driver.find_elements(By.CLASS_NAME, "Grid_item")
     
@@ -57,8 +61,15 @@ def parse_deck(deck_code: str):
 if __name__ == "__main__":
     pokemon_dict, tool_dict, supporter_dict, stage_dict, energy_dict = \
     parse_deck(deck_code = "cxxD8D-F0CeQo-8YxJ88")
+    print("--- use deck code")
+    print("pokemon_dict"); print(pokemon_dict)
+    print("tool_dict"); print(tool_dict)
+    print("supporter_dict"); print(supporter_dict)
+    print("stage_dict"); print(stage_dict)
+    print("energy_dict"); print(energy_dict)
     
-    print("---")
+    parse_deck(deck_link = "https://www.pokemon-card.com/deck/confirm.html/deckID/kV1kvF-A9aA3G-Vw5FV1")
+    print("--- use deck link")
     print("pokemon_dict"); print(pokemon_dict)
     print("tool_dict"); print(tool_dict)
     print("supporter_dict"); print(supporter_dict)
