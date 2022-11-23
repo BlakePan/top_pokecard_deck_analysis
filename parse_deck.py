@@ -76,21 +76,21 @@ def parse_deck(deck_code: str = None, deck_link: str = None):
 
 
 if __name__ == "__main__":
-#     pokemon_dict, tool_dict, supporter_dict, stage_dict, energy_dict = \
-#     parse_deck(deck_code = "cxxD8D-F0CeQo-8YxJ88")
-#     print("--- use deck code")
-#     print("pokemon_dict"); print(pokemon_dict)
-#     print("tool_dict"); print(tool_dict)
-#     print("supporter_dict"); print(supporter_dict)
-#     print("stage_dict"); print(stage_dict)
-#     print("energy_dict"); print(energy_dict)
-
     pokemon_dict, tool_dict, supporter_dict, stage_dict, energy_dict = \
-    parse_deck(deck_link = "https://www.pokemon-card.com/deck/confirm.html/deckID/KcDc84-6NuRAE-8x848x")
-#     parse_deck(deck_link = "https://www.pokemon-card.com/deck/confirm.html/deckID/NnngQg-WZuTqi-giLn9L")
-    print("--- use deck link")
+    parse_deck(deck_code = "gngLgL-7AWHa3-LNgNnn")
+    print("--- use deck code")
     print("pokemon_dict"); print(pokemon_dict)
     print("tool_dict"); print(tool_dict)
     print("supporter_dict"); print(supporter_dict)
     print("stage_dict"); print(stage_dict)
     print("energy_dict"); print(energy_dict)
+
+#     pokemon_dict, tool_dict, supporter_dict, stage_dict, energy_dict = \
+#     parse_deck(deck_link = "https://www.pokemon-card.com/deck/confirm.html/deckID/KcDc84-6NuRAE-8x848x")
+# #     parse_deck(deck_link = "https://www.pokemon-card.com/deck/confirm.html/deckID/NnngQg-WZuTqi-giLn9L")
+#     print("--- use deck link")
+#     print("pokemon_dict"); print(pokemon_dict)
+#     print("tool_dict"); print(tool_dict)
+#     print("supporter_dict"); print(supporter_dict)
+#     print("stage_dict"); print(stage_dict)
+#     print("energy_dict"); print(energy_dict)
