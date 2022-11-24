@@ -85,15 +85,20 @@ def parse_deck(deck_code: str = None, deck_link: str = None):
     return pokemon_dict, tool_dict, supporter_dict, stage_dict, energy_dict
 
 
-def parse_event_to_deck(event_link: str, num_people: int, decks: dict, all_categories: list):
+def parse_event_to_deck(event_link: str, num_people: int, decks: dict, all_categories: list, skip_codes: list = None):
+    skip_codes = [] if skip_codes is None else skip_codes
     driver = webdriver.Chrome(options=chrome_options)
     driver.implicitly_wait(10) # seconds
     driver.get(event_link)
     date_str = driver.find_element(By.CLASS_NAME, "date-day").text
     deck_elems = driver.find_elements(By.CLASS_NAME, "c-rankTable-row")
+
     for deck_elem in deck_elems:
         deck_link = deck_elem.find_element(By.CLASS_NAME, "deck").find_element(By.TAG_NAME, "a").get_property("href")
         deck_code = deck_link.split("/")[-1]
+        if deck_code in skip_codes:
+            continue
+
         pokemon_dict, tool_dict, supporter_dict, stage_dict, energy_dict = parse_deck(deck_link = deck_link)
         category = find_category(all_categories, pokemon_dict)
         rank = int(deck_elem.find_element(By.TAG_NAME, "td").get_attribute("class").split("-")[-1])
@@ -121,8 +126,8 @@ def parse_event_to_deck(event_link: str, num_people: int, decks: dict, all_categ
 
 if __name__ == "__main__":
     pokemon_dict, tool_dict, supporter_dict, stage_dict, energy_dict = \
-    parse_deck(deck_code = "gngLgL-7AWHa3-LNgNnn")
-    parse_deck(deck_link = "https://www.pokemon-card.com/deck/confirm.html/deckID/gngLgL-7AWHa3-LNgNnn")
+    parse_deck(deck_code = "pyyypy-FHfMje-MypyyM")
+#     parse_deck(deck_link = "https://www.pokemon-card.com/deck/confirm.html/deckID/gngLgL-7AWHa3-LNgNnn")
     print("parse_deck():")
     print("pokemon_dict"); print(pokemon_dict)
     print("tool_dict"); print(tool_dict)
@@ -131,10 +136,10 @@ if __name__ == "__main__":
     print("energy_dict"); print(energy_dict)
     print("\n")
 
-    event_link = "https://players.pokemon-card.com/event/detail/31798/result"
-    num_people = 32
-    all_categories = ["ルギアVSTAR", "ミュウVMAX", "ジュラルドンVMAX", "others"]
-    decks = {}
-    parse_event_to_deck(event_link, num_people, decks, all_categories)
-    print("parse_event_to_deck()")
-    print(decks)
+#     event_link = "https://players.pokemon-card.com/event/detail/31798/result"
+#     num_people = 32
+#     all_categories = ["ルギアVSTAR", "ミュウVMAX", "ジュラルドンVMAX", "others"]
+#     decks = {}
+#     parse_event_to_deck(event_link, num_people, decks, all_categories)
+#     print("parse_event_to_deck()")
+#     print(decks)
