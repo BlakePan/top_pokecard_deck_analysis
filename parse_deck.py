@@ -2,30 +2,89 @@ from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+
+from tqdm import tqdm
+import re
+import unicodedata
 
 chrome_options = Options()
 chrome_options.add_argument("--headless")
 chrome_options.add_argument("--start-maximized")
+
+# https://blog.csdn.net/sxf1061700625/article/details/124263680
+# disable images
+chrome_options.add_argument('blink-settings=imagesEnabled=false')
+chrome_options.add_argument('--disable-images')
+# disable javascripts
+chrome_options.add_argument("--disable-javascript")
+chrome_options.add_argument("--disable-plugins")
+chrome_options.add_argument('--disable-dev-shm-usage')
+chrome_options.add_argument('--disable-software-rasterizer')
+chrome_options.add_argument('--disable-extensions')
+chrome_options.add_argument('--disable-gpu')
+chrome_options.add_argument('--disable-java')
+chrome_options.add_argument('--no-sandbox')
+chrome_options.add_argument('--mute-audio')
+chrome_options.add_argument('--single-process')
+chrome_options.add_argument("--disable-blink-features")
+chrome_options.add_argument("--disable-blink-features=AutomationControlled")
+chrome_options.add_argument('--incognito')
+
+
+def full2half(c: str) -> str:
+    return unicodedata.normalize("NFKC", c)
+
+
+def wait_loading_circle(driver, timeout: int = 20):
+    WebDriverWait(driver, 20).until(EC.invisibility_of_element_located((By.XPATH, "//div[@class='sk-circle-container']")))
+
 
 def extract_card(cards):
     _dict = {}
     
     for c in cards[1:]:
         c = c.split(" ")
+        loc = -1
         if '（' in c[0]:
             loc = c[0].find('（')
-            c[0] = c[0][:loc]
+        elif '(' in c[0]:
+            loc = c[0].find('(')
+        c[0] = c[0][:loc] if loc != -1 else c[0]
         _dict[c[0]] = int(c[-1][:-1])
     
     return _dict
 
 
-def find_category(all_categories, pokemon_dict):
+def find_category(all_categories: dict, pokemon_dict: dict):
     # identify this deck belongs to which category (TODO: need more rules)
     category = "others"
-    for c in all_categories[:-1]:
-        if c in pokemon_dict.keys():
+    poke_cards = pokemon_dict.keys()
+
+    for c in all_categories["simple"]:
+        if c in poke_cards:
             category = c
+            break
+
+    if category != "others":
+        pass
+    else:
+        if "ゾロア" in poke_cards:
+            if "ヒスイ ウインディ" in poke_cards:
+                category = "others"
+            else:
+                category = "ゾロア"
+        elif "レジドラゴVSTAR" in poke_cards:
+            if "アルセウスVSTAR" in poke_cards:
+                category = "アルレジドラゴVSTAR"
+            else:
+                category = "レジドラゴVSTAR"
+        elif "ギラティナVSTAR" in poke_cards:
+            if "キュワワー" in poke_cards:
+                category = "LOST ギラティナVSTAR"
+            else:
+                category = "Other ギラティナVSTAR"
 
     return category
 
@@ -85,49 +144,88 @@ def parse_deck(deck_code: str = None, deck_link: str = None):
     return pokemon_dict, tool_dict, supporter_dict, stage_dict, energy_dict
 
 
-def parse_event_to_deck(event_link: str, num_people: int, decks: dict, all_categories: list, skip_codes: list = None):
-    skip_codes = [] if skip_codes is None else skip_codes
+def parse_event_to_deck(event_link: str, num_people: int, decks: dict, all_categories: dict, skip_codes: list):
     driver = webdriver.Chrome(options=chrome_options)
     driver.implicitly_wait(10) # seconds
     driver.get(event_link)
     date_str = driver.find_element(By.CLASS_NAME, "date-day").text
     deck_elems = driver.find_elements(By.CLASS_NAME, "c-rankTable-row")
 
-    for deck_elem in deck_elems:
-        deck_link = deck_elem.find_element(By.CLASS_NAME, "deck").find_element(By.TAG_NAME, "a").get_property("href")
-        deck_code = deck_link.split("/")[-1]
-        if deck_code in skip_codes:
-            continue
+    for deck_idx, deck_elem in enumerate(deck_elems):
+        try:
+            deck_link = deck_elem.find_element(By.CLASS_NAME, "deck").find_element(By.TAG_NAME, "a").get_property("href")
+            deck_code = deck_link.split("/")[-1]
+            if deck_code in skip_codes:
+                continue
 
-        pokemon_dict, tool_dict, supporter_dict, stage_dict, energy_dict = parse_deck(deck_link = deck_link)
-        category = find_category(all_categories, pokemon_dict)
-        rank = int(deck_elem.find_element(By.TAG_NAME, "td").get_attribute("class").split("-")[-1])
+            pokemon_dict, tool_dict, supporter_dict, stage_dict, energy_dict = parse_deck(deck_link = deck_link)
+            category = find_category(all_categories, pokemon_dict)
+            rank = int(deck_elem.find_element(By.TAG_NAME, "td").get_attribute("class").split("-")[-1])
 
-        if category not in decks:
-            decks[category] = []
+            if category not in decks:
+                decks[category] = []
 
-        decks[category].append(
-            {
-                "deck_link": deck_link,
-                "deck_code": deck_code,
-                "pokemons": pokemon_dict,
-                "tools": tool_dict,
-                "supporters": supporter_dict,
-                "stages": stage_dict,
-                "energies": energy_dict,
-                "rank": rank,
-                "num_people": num_people,
-                "date": date_str
-            }
-        )
+            decks[category].append(
+                {
+                    "deck_link": deck_link,
+                    "deck_code": deck_code,
+                    "pokemons": pokemon_dict,
+                    "tools": tool_dict,
+                    "supporters": supporter_dict,
+                    "stages": stage_dict,
+                    "energies": energy_dict,
+                    "rank": rank,
+                    "num_people": num_people,
+                    "date": date_str
+                }
+            )
+        except Exception as e:
+            print(e)
+            print(event_link)
+            print(f"skip deck no. {deck_idx}")
+
+    driver.close()
+
+
+def parse_events_from_official(decks: dict, all_categories: dict,
+                               skip_codes: list = None, page_limit: int = 10, event_limit: int = 100):
+    skip_codes = [] if skip_codes is None else skip_codes
+
+    # parse CL event links from official website
+    url = "https://players.pokemon-card.com/event/result/list"
+    driver = webdriver.Chrome(options=chrome_options)  # options=chrome_options
+    driver.implicitly_wait(10) # seconds
+    driver.get(url)
+
+    page_cnt = 0
+    event_cnt = 0
+    while 1:
+        events = driver.find_elements(By.CLASS_NAME, "eventListItem")
+        for event in tqdm(events):
+            title = event.find_element(By.CLASS_NAME, "title")
+            if "シティリーグ" in title.text:
+                num_people_str = event.find_element(By.CLASS_NAME, "capacity").text
+                num_people = re.findall(r'\d+', num_people_str)
+                num_people = int(num_people[0]) if len(num_people) == 1 else None
+                event_link = event.get_attribute("href")
+                parse_event_to_deck(event_link, num_people, decks, all_categories, skip_codes)
+                event_cnt += 1
+        page_cnt += 1
+
+        if page_cnt >= page_limit or event_cnt >= event_limit:
+            break
+
+        # nevigate to the next page
+        driver.find_element(By.CLASS_NAME, "btn.next").click()
+        wait_loading_circle(driver)
 
     driver.close()
 
 
 if __name__ == "__main__":
     pokemon_dict, tool_dict, supporter_dict, stage_dict, energy_dict = \
-    parse_deck(deck_code = "pyyypy-FHfMje-MypyyM")
-#     parse_deck(deck_link = "https://www.pokemon-card.com/deck/confirm.html/deckID/gngLgL-7AWHa3-LNgNnn")
+    parse_deck(deck_link = "https://www.pokemon-card.com/deck/confirm.html/deckID/PQggnQ-Vb4tBi-LQnLnH")
+    #     parse_deck(deck_code = "gngLgL-7AWHa3-LNgNnn")
     print("parse_deck():")
     print("pokemon_dict"); print(pokemon_dict)
     print("tool_dict"); print(tool_dict)
