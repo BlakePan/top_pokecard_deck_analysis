@@ -57,7 +57,7 @@ def extract_card(cards):
     return _dict
 
 
-def find_category(all_categories: dict, pokemon_dict: dict):
+def find_category(all_categories: dict, pokemon_dict: dict) -> str:
     # identify this deck belongs to which category (TODO: need more rules)
     category = "others"
     poke_cards = pokemon_dict.keys()
@@ -85,8 +85,40 @@ def find_category(all_categories: dict, pokemon_dict: dict):
                 category = "LOST ギラティナVSTAR"
             else:
                 category = "Other ギラティナVSTAR"
+        elif "キュワワー" in poke_cards:
+            if "フリーザー" in poke_cards and "ヤミラミ" not in poke_cards:
+                category = "LTB ウッウ"
+            elif "かがやくリザードン" in poke_cards:
+                category = "LTB リザードン" if "ヤミラミ" not in poke_cards else "LTB ヤミラミ リザードン"
+            elif "かがやくゲッコウガ" in poke_cards:
+                category = "LTB"
+            else:
+                category = "Other Lost"
+        elif "レジギガス" in poke_cards and \
+                "レジドラゴ" in poke_cards and \
+                "レジスチル" in poke_cards and \
+                "レジロック" in poke_cards and \
+                "レジアイス" in poke_cards and \
+                "レジエレキ" in poke_cards:
+            category = "レジ"
 
     return category
+
+
+def reassign_category(decks: dict, all_categories: dict) -> dict:
+    """
+    """
+    new_decks = {}
+
+    for k in decks.keys():
+        for d in decks[k]:
+            category = find_category(all_categories, d["pokemons"])
+            if category not in new_decks:
+                new_decks[category] = []
+
+            new_decks[category].append(d)
+
+    return new_decks
 
 
 def parse_deck(deck_code: str = None, deck_link: str = None):
@@ -144,45 +176,65 @@ def parse_deck(deck_code: str = None, deck_link: str = None):
     return pokemon_dict, tool_dict, supporter_dict, stage_dict, energy_dict
 
 
-def parse_event_to_deck(event_link: str, num_people: int, decks: dict, all_categories: dict, skip_codes: list):
+def parse_event_to_deck(event_link: str,
+                        num_people: int,
+                        decks: dict,
+                        all_categories: dict,
+                        skip_codes: list,
+                        num_pages: int = 1):
+    """
+    num_pages < 0: parse all pages
+    """
     driver = webdriver.Chrome(options=chrome_options)
     driver.implicitly_wait(10) # seconds
     driver.get(event_link)
     date_str = driver.find_element(By.CLASS_NAME, "date-day").text
-    deck_elems = driver.find_elements(By.CLASS_NAME, "c-rankTable-row")
 
-    for deck_idx, deck_elem in enumerate(deck_elems):
+    while num_pages:
+        deck_elems = driver.find_elements(By.CLASS_NAME, "c-rankTable-row")
+        for deck_idx, deck_elem in enumerate(deck_elems):
+            try:
+                deck_link = deck_elem.find_element(By.CLASS_NAME, "deck").find_element(By.TAG_NAME, "a").get_property("href")
+                deck_code = deck_link.split("/")[-1]
+                if deck_code in skip_codes:
+                    continue
+
+                pokemon_dict, tool_dict, supporter_dict, stage_dict, energy_dict = parse_deck(deck_link = deck_link)
+                category = find_category(all_categories, pokemon_dict)
+                rank = int(deck_elem.find_element(By.TAG_NAME, "td").get_attribute("class").split("-")[-1])
+
+                if category not in decks:
+                    decks[category] = []
+
+                decks[category].append(
+                    {
+                        "deck_link": deck_link,
+                        "deck_code": deck_code,
+                        "pokemons": pokemon_dict,
+                        "tools": tool_dict,
+                        "supporters": supporter_dict,
+                        "stages": stage_dict,
+                        "energies": energy_dict,
+                        "rank": rank,
+                        "num_people": num_people,
+                        "date": date_str
+                    }
+                )
+            except Exception as e:
+                print(e)
+                print(event_link)
+                print(f"skip deck no. {deck_idx}")
+
+        # nevigate to the next page
         try:
-            deck_link = deck_elem.find_element(By.CLASS_NAME, "deck").find_element(By.TAG_NAME, "a").get_property("href")
-            deck_code = deck_link.split("/")[-1]
-            if deck_code in skip_codes:
-                continue
-
-            pokemon_dict, tool_dict, supporter_dict, stage_dict, energy_dict = parse_deck(deck_link = deck_link)
-            category = find_category(all_categories, pokemon_dict)
-            rank = int(deck_elem.find_element(By.TAG_NAME, "td").get_attribute("class").split("-")[-1])
-
-            if category not in decks:
-                decks[category] = []
-
-            decks[category].append(
-                {
-                    "deck_link": deck_link,
-                    "deck_code": deck_code,
-                    "pokemons": pokemon_dict,
-                    "tools": tool_dict,
-                    "supporters": supporter_dict,
-                    "stages": stage_dict,
-                    "energies": energy_dict,
-                    "rank": rank,
-                    "num_people": num_people,
-                    "date": date_str
-                }
-            )
+            num_pages -= 1
+            if num_pages:
+                driver.find_element(By.CLASS_NAME, "btn.next").click()
+                wait_loading_circle(driver)
         except Exception as e:
             print(e)
-            print(event_link)
-            print(f"skip deck no. {deck_idx}")
+            print("next deck page not found")
+            break
 
     driver.close()
 
@@ -216,17 +268,26 @@ def parse_events_from_official(decks: dict, all_categories: dict,
             break
 
         # nevigate to the next page
-        driver.find_element(By.CLASS_NAME, "btn.next").click()
+        try:
+            driver.find_element(By.CLASS_NAME, "btn.next").click()
+        except Exception as e:
+            print(e)
+            print("next event page not found")
+            break
         wait_loading_circle(driver)
 
     driver.close()
 
 
 if __name__ == "__main__":
+    all_categories = {"simple": ["ルギアVSTAR", "ミュウVMAX", "ジュラルドンVMAX", "ムゲンダイナVMAX"]}
+
     pokemon_dict, tool_dict, supporter_dict, stage_dict, energy_dict = \
-    parse_deck(deck_link = "https://www.pokemon-card.com/deck/confirm.html/deckID/PQggnQ-Vb4tBi-LQnLnH")
-    #     parse_deck(deck_code = "gngLgL-7AWHa3-LNgNnn")
+        parse_deck(deck_link = "https://www.pokemon-card.com/deck/confirm.html/deckID/gNNgLn-iz2ItL-QngnnL")
+#         parse_deck(deck_code = "gngLgL-7AWHa3-LNgNnn")
+    category = find_category(all_categories, pokemon_dict)
     print("parse_deck():")
+    print(f"category: {category}")
     print("pokemon_dict"); print(pokemon_dict)
     print("tool_dict"); print(tool_dict)
     print("supporter_dict"); print(supporter_dict)
@@ -234,10 +295,16 @@ if __name__ == "__main__":
     print("energy_dict"); print(energy_dict)
     print("\n")
 
-#     event_link = "https://players.pokemon-card.com/event/detail/31798/result"
-#     num_people = 32
-#     all_categories = ["ルギアVSTAR", "ミュウVMAX", "ジュラルドンVMAX", "others"]
+#     event_link = "https://players.pokemon-card.com/event/detail/45996/result"
+#     num_people = 300
 #     decks = {}
-#     parse_event_to_deck(event_link, num_people, decks, all_categories)
+#     parse_event_to_deck(event_link, num_people, decks, all_categories, [], num_pages=2)
 #     print("parse_event_to_deck()")
 #     print(decks)
+#     print(decks.keys())
+#     for k in decks.keys():
+#         print(f"[{k}]: {len(decks[k])}")
+
+#     import json
+#     with open("test_parse_deck.json", 'w') as f:
+#         json.dump(decks, f, ensure_ascii=False, indent=4)
