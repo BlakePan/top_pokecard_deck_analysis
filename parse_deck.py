@@ -72,7 +72,7 @@ def find_category(all_categories: dict, pokemon_dict: dict) -> str:
     else:
         if "ゾロア" in poke_cards:
             if "ヒスイ ウインディ" in poke_cards:
-                category = "others"
+                category = "ゾロア ウインディ"
             else:
                 category = "ゾロア"
         elif "レジドラゴVSTAR" in poke_cards:
@@ -101,6 +101,13 @@ def find_category(all_categories: dict, pokemon_dict: dict) -> str:
                 "レジアイス" in poke_cards and \
                 "レジエレキ" in poke_cards:
             category = "レジ"
+        elif "アルセウスVSTAR" in poke_cards:
+            if "メッソン" in poke_cards:
+                category = "アルセウス裏工作"
+            elif "ジュラルドンVMAX" in poke_cards:
+                category = "アル ジュラルドン"
+            elif "そらをとぶピカチュウVMAX" in poke_cards:
+                category = "アル そらをとぶピカチュウ"
 
     return category
 
