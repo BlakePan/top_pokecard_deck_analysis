@@ -57,10 +57,11 @@ def extract_card(cards):
     return _dict
 
 
-def find_category(all_categories: dict, pokemon_dict: dict) -> str:
+def find_category(all_categories: dict, pokemon_dict: dict, tool_dict: dict) -> str:
     # identify this deck belongs to which category (TODO: need more rules)
     category = "others"
     poke_cards = pokemon_dict.keys()
+    tool_cards = tool_dict.keys()
 
     for c in all_categories["simple"]:
         if c in poke_cards:
@@ -72,28 +73,32 @@ def find_category(all_categories: dict, pokemon_dict: dict) -> str:
     else:
         if "ゾロア" in poke_cards:
             if "ヒスイ ウインディ" in poke_cards:
-                category = "ゾロア ウインディ"
+                category = "ゾロア_ウインディ"
             else:
                 category = "ゾロア"
         elif "レジドラゴVSTAR" in poke_cards:
             if "アルセウスVSTAR" in poke_cards:
-                category = "アルレジドラゴVSTAR"
+                category = "アル_レジドラゴVSTAR"
             else:
                 category = "レジドラゴVSTAR"
         elif "ギラティナVSTAR" in poke_cards:
             if "キュワワー" in poke_cards:
-                category = "LOST ギラティナVSTAR"
+                category = "LOST_ギラティナVSTAR"
             else:
-                category = "Other ギラティナVSTAR"
+                category = "Other_ギラティナVSTAR"
         elif "キュワワー" in poke_cards:
-            if "フリーザー" in poke_cards and "ヤミラミ" not in poke_cards:
-                category = "LTB ウッウ"
+            if "空の封印石" in tool_cards:
+                category = "LTB_空の封印石"
+            elif "フリーザー" in poke_cards and "ヤミラミ" not in poke_cards:
+                category = "LTB_ウッウ"
             elif "かがやくリザードン" in poke_cards:
-                category = "LTB リザードン" if "ヤミラミ" not in poke_cards else "LTB ヤミラミ リザードン"
-            elif "かがやくゲッコウガ" in poke_cards:
-                category = "LTB"
+                category = "LTB_リザードン" if "ヤミラミ" not in poke_cards else "LTB_ヤミラミ_リザードン"
+            elif "ヤミラミ" not in poke_cards:
+                category = "Other_Lost"
+            elif "カイオーガ" in poke_cards:
+                category = "LTB_カイオーガ"
             else:
-                category = "Other Lost"
+                category = "LTB"
         elif "レジギガス" in poke_cards and \
                 "レジドラゴ" in poke_cards and \
                 "レジスチル" in poke_cards and \
@@ -105,9 +110,9 @@ def find_category(all_categories: dict, pokemon_dict: dict) -> str:
             if "メッソン" in poke_cards:
                 category = "アルセウス裏工作"
             elif "ジュラルドンVMAX" in poke_cards:
-                category = "アル ジュラルドン"
+                category = "アル_ジュラルドン"
             elif "そらをとぶピカチュウVMAX" in poke_cards:
-                category = "アル そらをとぶピカチュウ"
+                category = "アル_そらをとぶピカチュウ"
 
     return category
 
@@ -119,7 +124,7 @@ def reassign_category(decks: dict, all_categories: dict) -> dict:
 
     for k in decks.keys():
         for d in decks[k]:
-            category = find_category(all_categories, d["pokemons"])
+            category = find_category(all_categories, d["pokemons"], d["tools"])
             if category not in new_decks:
                 new_decks[category] = []
 
@@ -207,7 +212,7 @@ def parse_event_to_deck(event_link: str,
                     continue
 
                 pokemon_dict, tool_dict, supporter_dict, stage_dict, energy_dict = parse_deck(deck_link = deck_link)
-                category = find_category(all_categories, pokemon_dict)
+                category = find_category(all_categories, pokemon_dict, tool_dict)
                 rank = int(deck_elem.find_element(By.TAG_NAME, "td").get_attribute("class").split("-")[-1])
 
                 if category not in decks:
@@ -292,7 +297,7 @@ if __name__ == "__main__":
     pokemon_dict, tool_dict, supporter_dict, stage_dict, energy_dict = \
         parse_deck(deck_link = "https://www.pokemon-card.com/deck/confirm.html/deckID/gNNgLn-iz2ItL-QngnnL")
 #         parse_deck(deck_code = "gngLgL-7AWHa3-LNgNnn")
-    category = find_category(all_categories, pokemon_dict)
+    category = find_category(all_categories, pokemon_dict, tool_dict)
     print("parse_deck():")
     print(f"category: {category}")
     print("pokemon_dict"); print(pokemon_dict)
