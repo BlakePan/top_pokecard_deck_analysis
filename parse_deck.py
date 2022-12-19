@@ -88,7 +88,10 @@ def find_category(all_categories: dict, pokemon_dict: dict, tool_dict: dict) -> 
                 category = "Other_ギラティナVSTAR"
         elif "キュワワー" in poke_cards:
             if "空の封印石" in tool_cards:
-                category = "LTB_空の封印石"
+                if "かがやくゲッコウガ" in poke_cards:
+                    category = "LTB_空の封印石"
+                else:
+                    category = "LTB_空の封印石_other"
             elif "フリーザー" in poke_cards and "ヤミラミ" not in poke_cards:
                 category = "LTB_ウッウ"
             elif "かがやくリザードン" in poke_cards:
@@ -164,7 +167,14 @@ def parse_deck(deck_code: str = None, deck_link: str = None):
             """
             cards = e.text.split('\n')
             for i in range(1, len(cards), 4):
-                pokemon_dict[cards[i]] = int(cards[i+3][:-1])
+                card_name = cards[i]
+                card_code = cards[i+1] + '/' + cards[i+2]
+                # workaround for repeated name, TODO: add card code column
+                if card_name == "カイオーガ" and card_code == "S4a/036/190":
+                    card_name = "AR カイオーガ"
+
+                card_numbers = int(cards[i+3][:-1])
+                pokemon_dict[card_name] = card_numbers
         else:
             """
             example:
@@ -245,14 +255,19 @@ def parse_event_to_deck(event_link: str,
                 wait_loading_circle(driver)
         except Exception as e:
             print(e)
+            print(event_link)
             print("next deck page not found")
             break
 
     driver.close()
 
 
-def parse_events_from_official(decks: dict, all_categories: dict,
-                               skip_codes: list = None, page_limit: int = 10, event_limit: int = 100):
+def parse_events_from_official(decks: dict,
+                               all_categories: dict,
+                               skip_codes: list = None,
+                               page_limit: int = 10,
+                               event_limit: int = 100,
+                               num_page_in_event: int = 1):
     skip_codes = [] if skip_codes is None else skip_codes
 
     # parse CL event links from official website
@@ -265,14 +280,16 @@ def parse_events_from_official(decks: dict, all_categories: dict,
     event_cnt = 0
     while 1:
         events = driver.find_elements(By.CLASS_NAME, "eventListItem")
-        for event in tqdm(events):
+        pbar = tqdm(events)
+        for event in pbar:
+            pbar.set_description(f"Processing result page: {page_cnt}")
             title = event.find_element(By.CLASS_NAME, "title")
             if "シティリーグ" in title.text:
                 num_people_str = event.find_element(By.CLASS_NAME, "capacity").text
                 num_people = re.findall(r'\d+', num_people_str)
                 num_people = int(num_people[0]) if len(num_people) == 1 else None
                 event_link = event.get_attribute("href")
-                parse_event_to_deck(event_link, num_people, decks, all_categories, skip_codes)
+                parse_event_to_deck(event_link, num_people, decks, all_categories, skip_codes, num_page_in_event)
                 event_cnt += 1
         page_cnt += 1
 
