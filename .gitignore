@@ -129,4 +129,6 @@ dmypy.json
 .pyre/
 
 *.csv
+*.xlsx
+deck_db/
 .DS_Store
