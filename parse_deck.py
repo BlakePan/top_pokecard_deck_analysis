@@ -298,10 +298,24 @@ def parse_event_to_deck(
 def parse_events_from_official(
     decks: dict,
     skip_codes: list = None,
-    page_limit: int = 10,
-    event_limit: int = 100,
-    num_page_in_event: int = 1,
+    result_page_limit: int = 10,
+    event_page_limit: int = 100,
+    deck_page_limit: int = 1,
 ):
+    """[summary]
+
+    Args:
+        decks (dict): [description]
+        skip_codes (list, optional): [description]. Defaults to None.
+        result_page_limit (int, optional): [description]. Defaults to 10.
+        event_page_limit (int, optional): [description]. Defaults to 100.
+        deck_page_limit (int, optional):
+            < 0 for parse all deck pages
+            0 for no parsing
+            1 for top-8
+            2 for top-16, ...
+            Defaults to 1.
+    """
     skip_codes = [] if skip_codes is None else skip_codes
 
     # parse CL event links from official website
@@ -310,13 +324,14 @@ def parse_events_from_official(
     driver.implicitly_wait(2)  # seconds
     driver.get(url)
 
-    page_cnt = 0
-    event_cnt = 0
+    result_page_cnt = 0
+    event_page_cnt = 0
     while 1:
+        logger.info(f"Processing result page: {result_page_cnt}")
         events = driver.find_elements(By.CLASS_NAME, "eventListItem")
         pbar = tqdm(events)
         for event in pbar:
-            pbar.set_description(f"Processing result page: {page_cnt}")
+            pbar.set_description(f"Processing result page: {result_page_cnt}")
             title = event.find_element(By.CLASS_NAME, "title")
             if "シティリーグ" in title.text:
                 t1 = time.time()
@@ -334,17 +349,17 @@ def parse_events_from_official(
                     num_people,
                     decks,
                     skip_codes,
-                    num_page_in_event,
+                    deck_page_limit,
                 )
 
                 t3 = time.time()
                 logger.debug(f"Event Time diff part1: {t2 - t1}")
                 logger.debug(f"Event Time diff part2: {t3 - t2}")
 
-                event_cnt += 1
-        page_cnt += 1
+                event_page_cnt += 1
+        result_page_cnt += 1
 
-        if page_cnt >= page_limit or event_cnt >= event_limit:
+        if result_page_cnt >= result_page_limit or event_page_cnt >= event_page_limit:
             break
 
         # nevigate to the next page
