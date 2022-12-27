@@ -1,15 +1,29 @@
+import concurrent.futures
+import logging
+import os
 import re
+import threading
+import time
 import unicodedata
 
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 from tqdm import tqdm
 
 from deck_category_helper import find_category
+
+# Set up logging to a file
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    filename=f"logs/{os.path.basename(__file__)}.log",  # specify the log file name
+    filemode="w",
+)  # specify that the log file should be overwritten each time the script is run
+logger = logging.getLogger(__name__)
+
 
 chrome_options = Options()
 chrome_options.add_argument("--headless")
@@ -88,7 +102,7 @@ def parse_deck(deck_code: str = None, deck_link: str = None):
         else f"https://www.pokemon-card.com/deck/confirm.html/deckID/{deck_code}/"
     )
     driver = webdriver.Chrome(options=chrome_options)
-    driver.implicitly_wait(10)  # seconds
+    driver.implicitly_wait(2)  # seconds
 
     driver.get(url)
     driver.find_element(By.ID, "deckView01").click()  # Click リスト表示
@@ -146,6 +160,59 @@ def parse_deck(deck_code: str = None, deck_link: str = None):
     return pokemon_dict, tool_dict, supporter_dict, stadium_dict, energy_dict
 
 
+def crawl_pages(deck_metas):
+    # Create the shared dictionary
+    results = {}
+    lock = threading.Lock()
+
+    def crawl_page(deck_meta):
+        url = deck_meta["url"]
+        deck_code = deck_meta["deck_code"]
+        rank = deck_meta["rank"]
+        num_people = deck_meta["num_people"]
+        date = deck_meta["date"]
+
+        t1 = time.time()
+        pokemon_dict, tool_dict, supporter_dict, stadium_dict, energy_dict = parse_deck(
+            deck_link=url
+        )
+        t2 = time.time()
+        logger.debug(f"parse_deck Time diff part1: {t2-t1}")
+
+        category = find_category(pokemon_dict, tool_dict, energy_dict)
+
+        with lock:
+            if category not in results:
+                results[category] = []
+
+            results[category].append(
+                {
+                    "deck_link": url,
+                    "deck_code": deck_code,
+                    "pokemons": pokemon_dict,
+                    "tools": tool_dict,
+                    "supporters": supporter_dict,
+                    "stadiums": stadium_dict,
+                    "energies": energy_dict,
+                    "rank": rank,
+                    "num_people": num_people,
+                    "date": date,
+                }
+            )
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count()) as executor:
+        # Create a task for each deck
+        threads = []
+        for deck_meta in deck_metas:
+            task = executor.submit(crawl_page, deck_meta)
+            threads.append(task)
+
+        # Wait for all tasks to complete
+        concurrent.futures.wait(threads)
+
+    return results
+
+
 def parse_event_to_deck(
     event_link: str,
     num_people: int,
@@ -157,58 +224,46 @@ def parse_event_to_deck(
     num_pages < 0: parse all pages
     """
     driver = webdriver.Chrome(options=chrome_options)
-    driver.implicitly_wait(10)  # seconds
+    driver.implicitly_wait(2)  # seconds
     driver.get(event_link)
     date_str = driver.find_element(By.CLASS_NAME, "date-day").text
 
+    t1 = time.time()
+    deck_metas = []
     while num_pages:
+        # Collect metadata of available decks
         deck_elems = driver.find_elements(By.CLASS_NAME, "c-rankTable-row")
         for deck_idx, deck_elem in enumerate(deck_elems):
             try:
-                deck_link = (
+                url = (
                     deck_elem.find_element(By.CLASS_NAME, "deck")
                     .find_element(By.TAG_NAME, "a")
                     .get_property("href")
                 )
-                deck_code = deck_link.split("/")[-1]
+
+                deck_code = url.split("/")[-1]
                 if deck_code in skip_codes:
                     continue
 
-                (
-                    pokemon_dict,
-                    tool_dict,
-                    supporter_dict,
-                    stadium_dict,
-                    energy_dict,
-                ) = parse_deck(deck_link=deck_link)
-                category = find_category(pokemon_dict, tool_dict, energy_dict)
                 rank = int(
                     deck_elem.find_element(By.TAG_NAME, "td")
                     .get_attribute("class")
                     .split("-")[-1]
                 )
 
-                if category not in decks:
-                    decks[category] = []
-
-                decks[category].append(
+                deck_metas.append(
                     {
-                        "deck_link": deck_link,
+                        "url": url,
                         "deck_code": deck_code,
-                        "pokemons": pokemon_dict,
-                        "tools": tool_dict,
-                        "supporters": supporter_dict,
-                        "stadiums": stadium_dict,
-                        "energies": energy_dict,
                         "rank": rank,
                         "num_people": num_people,
                         "date": date_str,
                     }
                 )
             except Exception as e:
-                print(e)
-                print(event_link)
-                print(f"skip deck no. {deck_idx}")
+                logger.debug(e)
+                logger.debug(event_link)
+                logger.debug(f"skip deck no. {deck_idx}")
 
         # nevigate to the next page
         try:
@@ -217,10 +272,25 @@ def parse_event_to_deck(
                 driver.find_element(By.CLASS_NAME, "btn.next").click()
                 wait_loading_circle(driver)
         except Exception as e:
-            print(e)
-            print(event_link)
-            print("next deck page not found")
+            logger.debug(e)
+            logger.debug(event_link)
+            logger.debug("next deck page not found")
             break
+    t2 = time.time()
+    logger.debug(f"Page Time diff part1: {t2-t1}")
+
+    # wait for results
+    logger.debug(deck_metas)
+    t1 = time.time()
+    results = crawl_pages(deck_metas)
+    t2 = time.time()
+    logger.debug(f"Page Time diff part2: {t2-t1}")
+
+    # update crawl results to decks
+    for category in results:
+        if category not in decks:
+            decks[category] = []
+        decks[category] += results[category]
 
     driver.close()
 
@@ -237,7 +307,7 @@ def parse_events_from_official(
     # parse CL event links from official website
     url = "https://players.pokemon-card.com/event/result/list"
     driver = webdriver.Chrome(options=chrome_options)  # options=chrome_options
-    driver.implicitly_wait(10)  # seconds
+    driver.implicitly_wait(2)  # seconds
     driver.get(url)
 
     page_cnt = 0
@@ -249,10 +319,16 @@ def parse_events_from_official(
             pbar.set_description(f"Processing result page: {page_cnt}")
             title = event.find_element(By.CLASS_NAME, "title")
             if "シティリーグ" in title.text:
+                t1 = time.time()
+
                 num_people_str = event.find_element(By.CLASS_NAME, "capacity").text
                 num_people = re.findall(r"\d+", num_people_str)
                 num_people = int(num_people[0]) if len(num_people) == 1 else None
                 event_link = event.get_attribute("href")
+                logger.debug(f"event_link: {event_link}")
+
+                t2 = time.time()
+
                 parse_event_to_deck(
                     event_link,
                     num_people,
@@ -260,6 +336,11 @@ def parse_events_from_official(
                     skip_codes,
                     num_page_in_event,
                 )
+
+                t3 = time.time()
+                logger.debug(f"Event Time diff part1: {t2 - t1}")
+                logger.debug(f"Event Time diff part2: {t3 - t2}")
+
                 event_cnt += 1
         page_cnt += 1
 
@@ -270,8 +351,8 @@ def parse_events_from_official(
         try:
             driver.find_element(By.CLASS_NAME, "btn.next").click()
         except Exception as e:
-            print(e)
-            print("next event page not found")
+            logger.debug(e)
+            logger.debug("next event page not found")
             break
         wait_loading_circle(driver)
 
@@ -279,10 +360,11 @@ def parse_events_from_official(
 
 
 if __name__ == "__main__":
+    t1 = time.time()
     pokemon_dict, tool_dict, supporter_dict, stadium_dict, energy_dict = parse_deck(
-        deck_link="https://www.pokemon-card.com/deck/confirm.html/deckID/gNNgLn-iz2ItL-QngnnL"
+        deck_link="https://www.pokemon-card.com/deck/confirm.html/deckID/c8G888-na3SQ1-x8aDGc"
     )
-    #         parse_deck(deck_code = "gngLgL-7AWHa3-LNgNnn")
+    t2 = time.time()
     category = find_category(pokemon_dict, tool_dict, energy_dict)
     print("parse_deck():")
     print(f"category: {category}")
@@ -296,6 +378,7 @@ if __name__ == "__main__":
     print(stadium_dict)
     print("energy_dict")
     print(energy_dict)
+    print(f"time diff: {t2-t1}")
     print("\n")
 
 #     event_link = "https://players.pokemon-card.com/event/detail/45996/result"
