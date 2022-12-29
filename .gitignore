@@ -130,5 +130,8 @@ dmypy.json
 
 *.csv
 *.xlsx
+csv/
+excel/
 deck_db/
+logs/
 .DS_Store

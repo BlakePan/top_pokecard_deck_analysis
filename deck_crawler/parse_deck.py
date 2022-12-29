@@ -5,6 +5,7 @@ import re
 import threading
 import time
 import unicodedata
+import copy
 
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
@@ -13,7 +14,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 from tqdm import tqdm
 
-from deck_category_helper import find_category
+from .deck_category_helper import find_category
 
 # Set up logging to a file
 logging.basicConfig(
@@ -320,56 +321,83 @@ def parse_events_from_official(
 
     # parse CL event links from official website
     url = "https://players.pokemon-card.com/event/result/list"
-    driver = webdriver.Chrome(options=chrome_options)  # options=chrome_options
-    driver.implicitly_wait(2)  # seconds
-    driver.get(url)
+    driver = webdriver.Chrome(options=chrome_options)
+    try:
+        driver.implicitly_wait(2)  # seconds
+        driver.get(url)
+    except Exception as e:
+        if isinstance(e, WebDriverException):
+            # handle the WebDriverException
+            logger.info("WebDriverException when parsing result link")
+        else:
+            # handle other exceptions
+            logger.info("Error when parsing result link")
+        logger.debug(e)
+        driver.close()
+        return
 
     result_page_cnt = 0
     event_page_cnt = 0
     while 1:
         logger.info(f"Processing result page: {result_page_cnt}")
-        events = driver.find_elements(By.CLASS_NAME, "eventListItem")
-        pbar = tqdm(events)
-        for event in pbar:
-            pbar.set_description(f"Processing result page: {result_page_cnt}")
-            title = event.find_element(By.CLASS_NAME, "title")
-            if "シティリーグ" in title.text:
-                t1 = time.time()
 
-                num_people_str = event.find_element(By.CLASS_NAME, "capacity").text
-                num_people = re.findall(r"\d+", num_people_str)
-                num_people = int(num_people[0]) if len(num_people) == 1 else None
-                event_link = event.get_attribute("href")
-                logger.debug(f"event_link: {event_link}")
+        decks_copy = copy.deepcopy(decks)
+        try:
+            events = driver.find_elements(By.CLASS_NAME, "eventListItem")
+            pbar = tqdm(events)
+            for event in pbar:
+                pbar.set_description(f"Processing result page: {result_page_cnt}")
+                title = event.find_element(By.CLASS_NAME, "title")
+                if "シティリーグ" in title.text:
+                    t1 = time.time()
 
-                t2 = time.time()
+                    num_people_str = event.find_element(By.CLASS_NAME, "capacity").text
+                    num_people = re.findall(r"\d+", num_people_str)
+                    num_people = int(num_people[0]) if len(num_people) == 1 else None
+                    event_link = event.get_attribute("href")
+                    logger.debug(f"event_link: {event_link}")
 
-                parse_event_to_deck(
-                    event_link,
-                    num_people,
-                    decks,
-                    skip_codes,
-                    deck_page_limit,
-                )
+                    t2 = time.time()
 
-                t3 = time.time()
-                logger.debug(f"Event Time diff part1: {t2 - t1}")
-                logger.debug(f"Event Time diff part2: {t3 - t2}")
+                    parse_event_to_deck(
+                        event_link,
+                        num_people,
+                        decks,
+                        skip_codes,
+                        deck_page_limit,
+                    )
 
-                event_page_cnt += 1
+                    t3 = time.time()
+                    logger.debug(f"Event Time diff part1: {t2 - t1}")
+                    logger.debug(f"Event Time diff part2: {t3 - t2}")
+
+                    event_page_cnt += 1
+        except Exception as e:
+            # error handling: log exception, skip this result page, and revert decks
+            if isinstance(e, WebDriverException):
+                logger.info("WebDriverException when parsing event link")
+                logger.info("This situation might cause by unstable network connection, please try to run the program again")
+            else:
+                logger.info("Error when parsing event link")
+
+            logger.debug(e)
+            logger.debug(f"Processing result page: {result_page_cnt}")
+
+            decks = copy.deepcopy(decks_copy)
+
+        # checking conditions
         result_page_cnt += 1
-
         if result_page_cnt >= result_page_limit or event_page_cnt >= event_page_limit:
             break
 
         # nevigate to the next page
         try:
             driver.find_element(By.CLASS_NAME, "btn.next").click()
+            wait_loading_circle(driver)
         except Exception as e:
             logger.debug(e)
             logger.debug("next event page not found")
             break
-        wait_loading_circle(driver)
 
     driver.close()
 
