@@ -1,15 +1,19 @@
 import concurrent.futures
+import copy
 import logging
 import os
 import re
 import threading
 import time
 import unicodedata
-import copy
+from typing import Any, Dict, List, Tuple, Union
 
 from selenium import webdriver
+from selenium.common.exceptions import (NoSuchElementException,
+                                        WebDriverException)
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
+from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 from tqdm import tqdm
@@ -20,9 +24,9 @@ from .deck_category_helper import find_category
 logging.basicConfig(
     level=logging.DEBUG,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    filename=f"logs/{os.path.basename(__file__)}.log",  # specify the log file name
+    filename=f"logs/{os.path.basename(__file__)}.log",
     filemode="w",
-)  # specify that the log file should be overwritten each time the script is run
+)
 logger = logging.getLogger(__name__)
 
 
@@ -51,355 +55,539 @@ chrome_options.add_argument("--incognito")
 
 
 def full2half(c: str) -> str:
+    """Converts a full-width character to a half-width character.
+
+    Args:
+        c (str): The full-width character to be converted.
+
+    Returns:
+        str: The half-width equivalent of the input character.
+    """
     return unicodedata.normalize("NFKC", c)
 
 
 def wait_loading_circle(driver, timeout: int = 20):
-    WebDriverWait(driver, 20).until(
+    """Waits for an element with the class `sk-circle-container`
+    (a loading circle) to become invisible on the page.
+
+    Args:
+        driver (WebDriver): A Selenium web driver instance.
+        timeout (int, optional): The maximum time to wait for the element
+        to become invisible. Defaults to 20.
+
+    Raises:
+        TimeoutError: If the element does not become invisible
+        within the specified timeout.
+    """
+    WebDriverWait(driver, timeout).until(
         EC.invisibility_of_element_located(
             (By.XPATH, "//div[@class='sk-circle-container']")
         )
     )
 
 
-def extract_card(cards):
-    _dict = {}
+def extract_card(cards: List[str]) -> Dict[str, int]:
+    """Extracts information about cards from a list of strings
+    and returns the information as a dictionary.
 
-    for c in cards[1:]:
-        c = c.split(" ")
-        loc = -1
-        if "（" in c[0]:
-            loc = c[0].find("（")
-        elif "(" in c[0]:
-            loc = c[0].find("(")
-        c[0] = c[0][:loc] if loc != -1 else c[0]
-        _dict[c[0]] = int(c[-1][:-1])
+    Args:
+        cards (List[str]): A list of strings containing card information.
 
-    return _dict
+    Returns:
+        Dict[str, int]: A dictionary with keys representing card names
+        and values representing card counts.
+    """
+    extracted_card_info = {}
+
+    for card_string in cards[1:]:
+        card_string = card_string.split(" ")
+        character_index = -1
+        for character in ["（", "("]:
+            if character in card_string[0]:
+                character_index = card_string[0].find(character)
+
+        # if there is a left parenthesis in the card name,
+        # then the card name will be modified for removing chars
+        # including and after the left parenthesis
+        # otherwise, just keep the same card name
+        card_string[0] = (
+            card_string[0][:character_index]
+            if character_index != -1
+            else card_string[0]
+        )
+        extracted_card_info[card_string[0]] = int(card_string[-1][:-1])
+
+    return extracted_card_info
 
 
 def reassign_category(decks: dict) -> dict:
-    """ """
+    """Reassigns a category to each deck in a dictionary of decks.
+
+    The category for each deck is determined by calling the
+    find_category function with the "pokemons", "tools", and "energies"
+    fields of the deck.
+    The decks are then added to a new dictionary, with the category
+    as the key and the deck as the value.
+
+    Args:
+        decks (dict): A dictionary of decks, with the keys as
+        categories and the values as lists of decks.
+
+    Returns:
+        dict: A dictionary of decks, with the keys as
+        categories and the values as lists of decks.
+    """
     new_decks = {}
 
-    for k in decks.keys():
-        for d in decks[k]:
-            category = find_category(d["pokemons"], d["tools"], d["energies"])
-            if category not in new_decks:
-                new_decks[category] = []
+    for category in decks.keys():
+        for deck in decks[category]:
+            assigned_category = find_category(
+                deck["pokemons"], deck["tools"], deck["energies"]
+            )
+            if assigned_category not in new_decks:
+                new_decks[assigned_category] = []
 
-            new_decks[category].append(d)
+            new_decks[assigned_category].append(deck)
 
     return new_decks
 
 
-def parse_deck(deck_code: str = None, deck_link: str = None):
+def parse_deck(deck_code: str = None, deck_link: str = None) -> Tuple:
+    """Parses a deck and returns the card information
+    as a tuple of dictionaries.
+
+    Args:
+        deck_code (str, optional): The code of the deck to parse.
+        deck_link (str, optional): The URL of the deck to parse.
+
+    Returns:
+        Tuple[Dict[str, int], ...]:
+            A tuple of dictionaries with keys representing card names and
+            values representing card counts.
+            The dictionaries represent the Pokemon cards, tool cards,
+            supporter cards, stadium cards, and energy cards, respectively.
+    """
+    # Return early if neither a deck code nor a deck link is provided
     if not deck_code and not deck_link:
         return
 
-    url = (
-        deck_link
-        if deck_link
-        else f"https://www.pokemon-card.com/deck/confirm.html/deckID/{deck_code}/"
-    )
-    driver = webdriver.Chrome(options=chrome_options)
-    driver.implicitly_wait(2)  # seconds
-
-    driver.get(url)
-    driver.find_element(By.ID, "deckView01").click()  # Click リスト表示
-    elems = driver.find_element(By.ID, "cardListView").find_elements(
-        By.CLASS_NAME, "Grid_item"
-    )
-
+    # Initialize dictionaries to store the card information
     pokemon_dict = {}  # {card_name: no.cards}
     tool_dict = {}
     supporter_dict = {}
     stadium_dict = {}
     energy_dict = {}
 
-    for e in elems:
-        if "ポケモン (" in e.text:
-            """
-            example:
+    # Use the deck link if provided,
+    # otherwise generate the URL using the deck code
+    url = (
+        deck_link
+        if deck_link
+        else f"https://www.pokemon-card.com/deck/confirm.html/deckID/{deck_code}/"
+    )
 
-            ポケモン (11)
-            ジュラルドンVMAX
-            S8b
-            253/184
-            3枚
-            """
-            cards = e.text.split("\n")
-            for i in range(1, len(cards), 4):
-                card_name = cards[i]
-                card_code = cards[i + 1] + "/" + cards[i + 2]
-                # workaround for repeated name, TODO: add card code column
-                if card_name == "カイオーガ" and card_code == "S4a/036/190":
-                    card_name = "AR カイオーガ"
+    with webdriver.Chrome(options=chrome_options) as driver:
+        # Initialize the web driver
+        driver.implicitly_wait(2)  # seconds
 
-                card_numbers = int(cards[i + 3][:-1])
-                pokemon_dict[card_name] = card_numbers
-        else:
-            """
-            example:
+        try:
+            # Navigate to the deck page and click the "list view" button
+            driver.get(url)
+            driver.find_element(By.ID, "deckView01").click()  # Click リスト表示
+            # Find the element containing the card information
+            elems = driver.find_element(By.ID, "cardListView").find_elements(
+                By.CLASS_NAME, "Grid_item"
+            )
 
-            グッズ (19)
-            クイックボール 3枚
-            """
-            cards = e.text.split("\n")
-            res = extract_card(cards)
-            if "グッズ (" in e.text:
-                tool_dict = res
-            elif "サポート (" in e.text:
-                supporter_dict = res
-            elif "スタジアム (" in e.text:
-                stadium_dict = res
-            elif "エネルギー (" in e.text:
-                energy_dict = res
+            for e in elems:
+                if "ポケモン (" in e.text:
+                    """
+                    example:
 
-    driver.close()
+                    ポケモン (11)
+                    ジュラルドンVMAX
+                    S8b
+                    253/184
+                    3枚
+                    """
+                    cards = e.text.split("\n")
+                    for i in range(1, len(cards), 4):
+                        card_name = cards[i]
+                        card_code = cards[i + 1] + "/" + cards[i + 2]
+                        # workaround for repeated name, TODO: add card code column
+                        if card_name == "カイオーガ" and card_code == "S4a/036/190":
+                            card_name = "AR カイオーガ"
+
+                        card_numbers = int(cards[i + 3][:-1])
+                        pokemon_dict[card_name] = card_numbers
+                else:
+                    """
+                    example:
+
+                    グッズ (19)
+                    クイックボール 3枚
+                    """
+                    cards = e.text.split("\n")
+                    res = extract_card(cards)
+                    if "グッズ (" in e.text:
+                        tool_dict = res
+                    elif "サポート (" in e.text:
+                        supporter_dict = res
+                    elif "スタジアム (" in e.text:
+                        stadium_dict = res
+                    elif "エネルギー (" in e.text:
+                        energy_dict = res
+        except Exception as e:
+            logger.info(f"An error occurred while parsing the deck: {e}")
+            logger.debug(e)
+            return None
 
     return pokemon_dict, tool_dict, supporter_dict, stadium_dict, energy_dict
 
 
-def crawl_pages(deck_metas):
+def crawl_deck_pages(
+    deck_metas: List[Dict[str, Any]]
+) -> Dict[str, List[Dict[str, Any]]]:
+    """
+    Crawl the pages of the given deck metadata in parallel using threads.
+
+    Parameters:
+    - deck_metas (List[Dict[str, Any]]):
+    a list of dictionaries containing metadata for each deck,
+    including the url, deck code, rank, number of people, and date
+
+    Returns:
+    - Dict[str, List[Dict[str, Any]]]:
+    a dictionary of lists of dictionaries containing
+    the parsed information for each deck, grouped by category
+    """
+
     # Create the shared dictionary
     results = {}
     lock = threading.Lock()
 
-    def crawl_page(deck_meta):
+    # Initialize an empty list to hold the results
+    temp_results = []
+
+    def crawl_deck_page(deck_meta):
         url = deck_meta["url"]
         deck_code = deck_meta["deck_code"]
         rank = deck_meta["rank"]
-        num_people = deck_meta["num_people"]
+        num_players = deck_meta["num_players"]
         date = deck_meta["date"]
 
         t1 = time.time()
-        pokemon_dict, tool_dict, supporter_dict, stadium_dict, energy_dict = parse_deck(
-            deck_link=url
-        )
+        ret = parse_deck(deck_link=url)
         t2 = time.time()
-        logger.debug(f"parse_deck Time diff part1: {t2-t1}")
+        logger.debug(f"parse_deck Time diff: {t2-t1}")
 
-        category = find_category(pokemon_dict, tool_dict, energy_dict)
+        if ret is not None:
+            pokemon_dict, tool_dict, supporter_dict, stadium_dict, energy_dict = ret
+        else:
+            logger.info(f"parse_deck Fail, {url}")
+            return
 
-        with lock:
-            if category not in results:
-                results[category] = []
-
-            results[category].append(
-                {
-                    "deck_link": url,
-                    "deck_code": deck_code,
-                    "pokemons": pokemon_dict,
-                    "tools": tool_dict,
-                    "supporters": supporter_dict,
-                    "stadiums": stadium_dict,
-                    "energies": energy_dict,
-                    "rank": rank,
-                    "num_people": num_people,
-                    "date": date,
-                }
-            )
+        temp_results.append(
+            {
+                "deck_link": url,
+                "deck_code": deck_code,
+                "pokemons": pokemon_dict,
+                "tools": tool_dict,
+                "supporters": supporter_dict,
+                "stadiums": stadium_dict,
+                "energies": energy_dict,
+                "rank": rank,
+                "num_players": num_players,
+                "date": date,
+            }
+        )
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count()) as executor:
         # Create a task for each deck
         threads = []
         for deck_meta in deck_metas:
-            task = executor.submit(crawl_page, deck_meta)
+            task = executor.submit(crawl_deck_page, deck_meta)
             threads.append(task)
 
         # Wait for all tasks to complete
         concurrent.futures.wait(threads)
 
+    # Update the results dictionary with the entire temp_results list
+    with lock:
+        for result in temp_results:
+            category = find_category(
+                result["pokemons"], result["tools"], result["energies"]
+            )
+            if category not in results:
+                results[category] = []
+            results[category].append(result)
+
     return results
+
+
+def parse_deck_meta(deck_elem: WebElement, skip_codes: List[str]) -> Dict[str, Any]:
+    """Parses metadata for a deck from a WebElement
+    representing a deck in a deck list table.
+
+    Parameters:
+    deck_elem (WebElement): WebElement representing
+    a deck in a deck list table.
+
+    skip_codes (List[str]): List of deck codes to skip.
+
+    Returns:
+    Dict[str, Any]: Dictionary containing metadata for the deck.
+    """
+
+    # Extract the URL for the deck element
+    url = (
+        deck_elem.find_element(By.CLASS_NAME, "deck")
+        .find_element(By.TAG_NAME, "a")
+        .get_property("href")
+    )
+
+    # Extract the deck code from the URL
+    deck_code = url.split("/")[-1]
+    if deck_code in skip_codes:
+        return None
+
+    # Extract the rank of the deck element
+    tag = deck_elem.find_element(By.TAG_NAME, "td")
+    rank = int(tag.get_attribute("class").split("-")[-1])
+
+    return {
+        "url": url,
+        "deck_code": deck_code,
+        "rank": rank,
+    }
 
 
 def parse_event_to_deck(
     event_link: str,
-    num_people: int,
-    decks: dict,
-    skip_codes: list,
+    num_players: int,
+    decks: Dict,
+    skip_codes: List[str],
     num_pages: int = 1,
-):
+) -> None:
     """
-    num_pages < 0: parse all pages
-    """
-    driver = webdriver.Chrome(options=chrome_options)
-    driver.implicitly_wait(2)  # seconds
-    driver.get(event_link)
-    date_str = driver.find_element(By.CLASS_NAME, "date-day").text
+    Parse a given event page and collect metadata of available decks.
 
-    t1 = time.time()
-    deck_metas = []
-    while num_pages:
-        # Collect metadata of available decks
-        deck_elems = driver.find_elements(By.CLASS_NAME, "c-rankTable-row")
-        for deck_idx, deck_elem in enumerate(deck_elems):
+    Parameters:
+    - event_link (str): the link of the event page
+    - num_players (int): the number of players who participated in the event
+    - decks (Dict): the dictionary to store the collected metadata
+    - skip_codes (List[str]): the list of deck codes to skip
+    - num_pages (int): the number of pages to parse (default: 1).
+    If num_pages < 0, parse all pages.
+    If num_pages = 0, no parsing.
+    If num_pages = 1, parse pages for top-8.
+    If num_pages = 2, parse pages for top-16.
+    And so on.
+
+    Returns:
+    None
+    """
+
+    with webdriver.Chrome(options=chrome_options) as driver:
+        # Initialize the web driver
+        driver.implicitly_wait(2)  # seconds
+
+        # Navigate to the event page
+        driver.get(event_link)
+        date_str = driver.find_element(By.CLASS_NAME, "date-day").text
+
+        t1 = time.time()
+        deck_metas = []
+        while num_pages:
+            # Collect metadata of available decks
+            deck_elems = driver.find_elements(By.CLASS_NAME, "c-rankTable-row")
+            for deck_idx, deck_elem in enumerate(deck_elems):
+                try:
+                    deck_meta = parse_deck_meta(deck_elem, skip_codes)
+                    if deck_meta is None:
+                        raise Exception(
+                            "This deck is parsed before,"
+                            "or there is an error while parsing deck meta "
+                        )
+                    deck_meta["num_players"] = num_players
+                    deck_meta["date"] = date_str
+
+                    deck_metas.append(deck_meta)
+                except Exception as e:
+                    logger.debug(e)
+                    logger.debug(event_link)
+                    logger.debug(f"skip deck no. {deck_idx}")
+
+            # nevigate to the next page
             try:
-                url = (
-                    deck_elem.find_element(By.CLASS_NAME, "deck")
-                    .find_element(By.TAG_NAME, "a")
-                    .get_property("href")
-                )
-
-                deck_code = url.split("/")[-1]
-                if deck_code in skip_codes:
-                    continue
-
-                rank = int(
-                    deck_elem.find_element(By.TAG_NAME, "td")
-                    .get_attribute("class")
-                    .split("-")[-1]
-                )
-
-                deck_metas.append(
-                    {
-                        "url": url,
-                        "deck_code": deck_code,
-                        "rank": rank,
-                        "num_people": num_people,
-                        "date": date_str,
-                    }
-                )
+                num_pages -= 1
+                if num_pages:
+                    driver.find_element(By.CLASS_NAME, "btn.next").click()
+                    wait_loading_circle(driver)
             except Exception as e:
+                if isinstance(e, TimeoutError):
+                    logger.info("Wait for loading circle Timeout")
+                elif isinstance(e, NoSuchElementException):
+                    if num_pages:
+                        logger.info("Next deck page not found")
+                    else:
+                        logger.info("There is no next deck page")
                 logger.debug(e)
                 logger.debug(event_link)
-                logger.debug(f"skip deck no. {deck_idx}")
+                break
+        t2 = time.time()
+        logger.debug(f"Page Time diff part1: {t2-t1}")
 
-        # nevigate to the next page
-        try:
-            num_pages -= 1
-            if num_pages:
-                driver.find_element(By.CLASS_NAME, "btn.next").click()
-                wait_loading_circle(driver)
-        except Exception as e:
-            logger.debug(e)
-            logger.debug(event_link)
-            logger.debug("next deck page not found")
-            break
-    t2 = time.time()
-    logger.debug(f"Page Time diff part1: {t2-t1}")
+        # wait for results
+        logger.debug(deck_metas)
+        t1 = time.time()
+        results = crawl_deck_pages(deck_metas)
+        t2 = time.time()
+        logger.debug(f"Page Time diff part2: {t2-t1}")
 
-    # wait for results
-    logger.debug(deck_metas)
-    t1 = time.time()
-    results = crawl_pages(deck_metas)
-    t2 = time.time()
-    logger.debug(f"Page Time diff part2: {t2-t1}")
+        # update crawl results to decks
+        for category in results:
+            if category not in decks:
+                decks[category] = []
+            decks[category] += results[category]
 
-    # update crawl results to decks
-    for category in results:
-        if category not in decks:
-            decks[category] = []
-        decks[category] += results[category]
 
-    driver.close()
+def get_event_meta(event_element: WebElement) -> Dict[str, Union[int, str]]:
+    """Extract metadata for an event from the given event element.
+
+    Parameters:
+        event_element (WebElement):
+        The WebElement representing an event on a webpage.
+
+    Returns:
+        Dict[str, Union[int, str]]:
+        A dictionary containing the metadata for the event.
+        The keys of the dictionary are 'num_players' and 'event_link',
+        and the values are the corresponding integer value for
+        the number of players and the string value for the event link.
+    """
+
+    num_players_str = event_element.find_element(By.CLASS_NAME, "capacity").text
+    num_players = re.findall(r"\d+", num_players_str)
+    num_players = (
+        int(num_players[0])
+        if isinstance(num_players, List) and len(num_players) == 1
+        else -1
+    )
+
+    event_link = event_element.get_attribute("href")
+
+    return {
+        "num_players": num_players,
+        "event_link": event_link,
+    }
 
 
 def parse_events_from_official(
-    decks: dict,
-    skip_codes: list = None,
+    decks: Dict,
+    skip_codes: List[int] = None,
     result_page_limit: int = 10,
     event_page_limit: int = 100,
     deck_page_limit: int = 1,
-):
-    """[summary]
+) -> None:
+    """Parses CL event links and metadata from the official website.
 
     Args:
-        decks (dict): [description]
-        skip_codes (list, optional): [description]. Defaults to None.
-        result_page_limit (int, optional): [description]. Defaults to 10.
-        event_page_limit (int, optional): [description]. Defaults to 100.
+        decks (Dict): A dictionary to store the parsed CL event data.
+
+        skip_codes (List[int], optional):
+        A list of deck codes to skip. Defaults to None.
+
+        result_page_limit (int, optional):
+        The maximum number of result pages to parse. Defaults to 10.
+
+        event_page_limit (int, optional):
+        The maximum number of event pages to parse. Defaults to 100.
+
         deck_page_limit (int, optional):
-            < 0 for parse all deck pages
-            0 for no parsing
-            1 for top-8
-            2 for top-16, ...
-            Defaults to 1.
+        The maximum number of deck pages to parse for each event.
+        If num_pages < 0, parse all pages.
+        If num_pages = 0, no parsing.
+        If num_pages = 1, parse pages for top-8.
+        If num_pages = 2, parse pages for top-16.
+        And so on.
     """
     skip_codes = [] if skip_codes is None else skip_codes
 
     # parse CL event links from official website
     url = "https://players.pokemon-card.com/event/result/list"
-    driver = webdriver.Chrome(options=chrome_options)
-    try:
-        driver.implicitly_wait(2)  # seconds
-        driver.get(url)
-    except Exception as e:
-        if isinstance(e, WebDriverException):
-            # handle the WebDriverException
-            logger.info("WebDriverException when parsing result link")
-        else:
-            # handle other exceptions
-            logger.info("Error when parsing result link")
-        logger.debug(e)
-        driver.close()
-        return
-
-    result_page_cnt = 0
-    event_page_cnt = 0
-    while 1:
-        logger.info(f"Processing result page: {result_page_cnt}")
-
-        decks_copy = copy.deepcopy(decks)
+    with webdriver.Chrome(options=chrome_options) as driver:
         try:
-            events = driver.find_elements(By.CLASS_NAME, "eventListItem")
-            pbar = tqdm(events)
-            for event in pbar:
-                pbar.set_description(f"Processing result page: {result_page_cnt}")
-                title = event.find_element(By.CLASS_NAME, "title")
-                if "シティリーグ" in title.text:
-                    t1 = time.time()
-
-                    num_people_str = event.find_element(By.CLASS_NAME, "capacity").text
-                    num_people = re.findall(r"\d+", num_people_str)
-                    num_people = int(num_people[0]) if len(num_people) == 1 else None
-                    event_link = event.get_attribute("href")
-                    logger.debug(f"event_link: {event_link}")
-
-                    t2 = time.time()
-
-                    parse_event_to_deck(
-                        event_link,
-                        num_people,
-                        decks,
-                        skip_codes,
-                        deck_page_limit,
-                    )
-
-                    t3 = time.time()
-                    logger.debug(f"Event Time diff part1: {t2 - t1}")
-                    logger.debug(f"Event Time diff part2: {t3 - t2}")
-
-                    event_page_cnt += 1
+            # Initialize the web driver
+            driver.implicitly_wait(2)  # seconds
+            # Navigate to the result page
+            driver.get(url)
         except Exception as e:
-            # error handling: log exception, skip this result page, and revert decks
             if isinstance(e, WebDriverException):
-                logger.info("WebDriverException when parsing event link")
-                logger.info("This situation might cause by unstable network connection, please try to run the program again")
+                logger.info("WebDriverException when parsing result link")
             else:
-                logger.info("Error when parsing event link")
-
+                logger.info("Error when parsing result link")
             logger.debug(e)
-            logger.debug(f"Processing result page: {result_page_cnt}")
+            return
 
-            decks = copy.deepcopy(decks_copy)
+        result_page_cnt = 0
+        event_page_cnt = 0
+        while result_page_cnt < result_page_limit and event_page_cnt < event_page_limit:
+            logger.info(f"Processing result page: {result_page_cnt}")
+            decks_copy = copy.deepcopy(decks)  # backup
+            try:
+                events = driver.find_elements(By.CLASS_NAME, "eventListItem")
+                pbar = tqdm(events)
+                for event in pbar:
+                    pbar.set_description(f"Processing result page: {result_page_cnt}")
+                    title = event.find_element(By.CLASS_NAME, "title")
+                    if "シティリーグ" in title.text:
+                        event_meta = get_event_meta(event)
 
-        # checking conditions
-        result_page_cnt += 1
-        if result_page_cnt >= result_page_limit or event_page_cnt >= event_page_limit:
-            break
+                        t1 = time.time()
+                        parse_event_to_deck(
+                            event_meta["event_link"],
+                            event_meta["num_players"],
+                            decks,
+                            skip_codes,
+                            deck_page_limit,
+                        )
+                        t2 = time.time()
+                        logger.debug(f"Event Time diff part1: {t2 - t1}")
 
-        # nevigate to the next page
-        try:
-            driver.find_element(By.CLASS_NAME, "btn.next").click()
-            wait_loading_circle(driver)
-        except Exception as e:
-            logger.debug(e)
-            logger.debug("next event page not found")
-            break
+                        event_page_cnt += 1
 
-    driver.close()
+            except Exception as e:
+                # Error handling:
+                # - log exception
+                # - skip this result page
+                # - and restore decks
+                if isinstance(e, WebDriverException):
+                    logger.info("WebDriverException when parsing event link")
+                    logger.info(
+                        "This situation might cause by"
+                        "unstable network connection,"
+                        "please try to run the program again"
+                    )
+                else:
+                    logger.info("Error when parsing event link")
+                logger.debug(e)
+                logger.debug(f"Processing result page: {result_page_cnt}")
+
+                decks = copy.deepcopy(decks_copy)  # restore
+
+            # nevigate to the next result page
+            result_page_cnt += 1
+            try:
+                driver.find_element(By.CLASS_NAME, "btn.next").click()
+                wait_loading_circle(driver)
+            except Exception as e:
+                if isinstance(e, TimeoutError):
+                    logger.info("Wait for loading circle Timeout")
+                elif isinstance(e, NoSuchElementException):
+                    logger.info("Next event page not found")
+                logger.debug(e)
+                break
 
 
 if __name__ == "__main__":
@@ -425,9 +613,9 @@ if __name__ == "__main__":
     print("\n")
 
 #     event_link = "https://players.pokemon-card.com/event/detail/45996/result"
-#     num_people = 300
+#     num_players = 300
 #     decks = {}
-#     parse_event_to_deck(event_link, num_people, decks, [], num_pages=2)
+#     parse_event_to_deck(event_link, num_players, decks, [], num_pages=2)
 #     print("parse_event_to_deck()")
 #     print(decks)
 #     print(decks.keys())
