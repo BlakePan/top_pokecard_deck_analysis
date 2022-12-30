@@ -275,6 +275,7 @@ def crawl_deck_pages(
         rank = deck_meta["rank"]
         num_players = deck_meta["num_players"]
         date = deck_meta["date"]
+        prefecture = deck_meta["prefecture"]
 
         t1 = time.time()
         ret = parse_deck(deck_link=url)
@@ -299,6 +300,7 @@ def crawl_deck_pages(
                 "rank": rank,
                 "num_players": num_players,
                 "date": date,
+                "prefecture": prefecture,
             }
         )
 
@@ -366,6 +368,7 @@ def parse_deck_meta(deck_elem: WebElement, skip_codes: List[str]) -> Dict[str, A
 def parse_event_to_deck(
     event_link: str,
     num_players: int,
+    prefecture: str,
     decks: Dict,
     skip_codes: List[str],
     num_pages: int = 1,
@@ -376,6 +379,7 @@ def parse_event_to_deck(
     Parameters:
     - event_link (str): the link of the event page
     - num_players (int): the number of players who participated in the event
+    - prefecture (str): the prefecture of this event
     - decks (Dict): the dictionary to store the collected metadata
     - skip_codes (List[str]): the list of deck codes to skip
     - num_pages (int): the number of pages to parse (default: 1).
@@ -412,6 +416,7 @@ def parse_event_to_deck(
                         )
                     deck_meta["num_players"] = num_players
                     deck_meta["date"] = date_str
+                    deck_meta["prefecture"] = prefecture
 
                     deck_metas.append(deck_meta)
                 except Exception as e:
@@ -478,9 +483,19 @@ def get_event_meta(event_element: WebElement) -> Dict[str, Union[int, str]]:
 
     event_link = event_element.get_attribute("href")
 
+    address = event_element.find_element(By.CLASS_NAME, "building").text
+    address = full2half(address)
+    for prefecture_name in ["県", "都", "府"]:
+        if prefecture_name in address:
+            index = address.find(prefecture_name)
+            address = address[:index+1]
+            break
+    prefecture = address.split(" ")[-1]
+
     return {
         "num_players": num_players,
         "event_link": event_link,
+        "prefecture": prefecture,
     }
 
 
@@ -549,6 +564,7 @@ def parse_events_from_official(
                         parse_event_to_deck(
                             event_meta["event_link"],
                             event_meta["num_players"],
+                            event_meta["prefecture"],
                             decks,
                             skip_codes,
                             deck_page_limit,
