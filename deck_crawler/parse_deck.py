@@ -18,7 +18,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 from tqdm import tqdm
 
-from .deck_category_helper import find_category
+from .deck_category_helper import find_categories
 
 # Set up logging to a file
 logging.basicConfig(
@@ -124,10 +124,8 @@ def reassign_category(decks: dict) -> dict:
     """Reassigns a category to each deck in a dictionary of decks.
 
     The category for each deck is determined by calling the
-    find_category function with the "pokemons", "tools", and "energies"
+    find_categories function with the "pokemons", "tools", and "energies"
     fields of the deck.
-    The decks are then added to a new dictionary, with the category
-    as the key and the deck as the value.
 
     Args:
         decks (dict): A dictionary of decks, with the keys as
@@ -141,13 +139,15 @@ def reassign_category(decks: dict) -> dict:
 
     for category in decks.keys():
         for deck in decks[category]:
-            assigned_category = find_category(
+            assigned_categories = find_categories(
                 deck["pokemons"], deck["tools"], deck["energies"]
             )
-            if assigned_category not in new_decks:
-                new_decks[assigned_category] = []
 
-            new_decks[assigned_category].append(deck)
+            for assigned_category in assigned_categories:
+                if assigned_category not in new_decks:
+                    new_decks[assigned_category] = []
+
+                new_decks[assigned_category].append(deck)
 
     return new_decks
 
@@ -315,12 +315,13 @@ def crawl_deck_pages(
     # Update the results dictionary with the entire temp_results list
     with lock:
         for result in temp_results:
-            category = find_category(
+            categories = find_categories(
                 result["pokemons"], result["tools"], result["energies"]
             )
-            if category not in results:
-                results[category] = []
-            results[category].append(result)
+            for category in categories:
+                if category not in results:
+                    results[category] = []
+                results[category].append(result)
 
     return results
 
@@ -596,9 +597,9 @@ if __name__ == "__main__":
         deck_link="https://www.pokemon-card.com/deck/confirm.html/deckID/c8G888-na3SQ1-x8aDGc"
     )
     t2 = time.time()
-    category = find_category(pokemon_dict, tool_dict, energy_dict)
+    categories = find_categories(pokemon_dict, tool_dict, energy_dict)
     print("parse_deck():")
-    print(f"category: {category}")
+    print(f"category: {categories}")
     print("pokemon_dict")
     print(pokemon_dict)
     print("tool_dict")
