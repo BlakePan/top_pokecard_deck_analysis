@@ -403,7 +403,8 @@ def parse_event_to_deck(
 
         t1 = time.time()
         deck_metas = []
-        while num_pages:
+        page_cnt = 0
+        while page_cnt < num_pages:
             # Collect metadata of available decks
             deck_elems = driver.find_elements(By.CLASS_NAME, "c-rankTable-row")
             for deck_idx, deck_elem in enumerate(deck_elems):
@@ -418,6 +419,19 @@ def parse_event_to_deck(
                     deck_meta["date"] = date_str
                     deck_meta["prefecture"] = prefecture
 
+                    # Calculate rank by rule-based, the risk will be the
+                    # template on website changes to other format,
+                    # so if the rank is not valid, just use the info
+                    # parsed from the web element
+                    rank = page_cnt * 8 + deck_idx + 1
+                    rank_max = deck_meta["rank"] + deck_meta["rank"] - 1 - 1
+                    if (
+                        deck_meta["rank"] >= 3
+                        and rank >= deck_meta["rank"]
+                        and rank <= rank_max
+                    ):
+                        deck_meta["rank"] = rank
+
                     deck_metas.append(deck_meta)
                 except Exception as e:
                     logger.debug(e)
@@ -426,8 +440,8 @@ def parse_event_to_deck(
 
             # nevigate to the next page
             try:
-                num_pages -= 1
-                if num_pages:
+                page_cnt += 1
+                if page_cnt < num_pages:
                     driver.find_element(By.CLASS_NAME, "btn.next").click()
                     wait_loading_circle(driver)
             except Exception as e:
@@ -488,7 +502,7 @@ def get_event_meta(event_element: WebElement) -> Dict[str, Union[int, str]]:
     for prefecture_name in ["県", "都", "府"]:
         if prefecture_name in address:
             index = address.find(prefecture_name)
-            address = address[:index+1]
+            address = address[: index + 1]
             break
     prefecture = address.split(" ")[-1]
 
@@ -573,6 +587,8 @@ def parse_events_from_official(
                         logger.debug(f"Event Time diff part1: {t2 - t1}")
 
                         event_page_cnt += 1
+                        if event_page_cnt >= event_page_limit:
+                            break
 
             except Exception as e:
                 # Error handling:
