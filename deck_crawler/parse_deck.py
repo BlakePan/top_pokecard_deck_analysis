@@ -147,7 +147,8 @@ def reassign_category(decks: dict) -> dict:
                 if assigned_category not in new_decks:
                     new_decks[assigned_category] = []
 
-                new_decks[assigned_category].append(deck)
+                if deck not in new_decks[assigned_category]:
+                    new_decks[assigned_category].append(deck)
 
     return new_decks
 
