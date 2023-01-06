@@ -214,13 +214,10 @@ def parse_deck(deck_code: str = None, deck_link: str = None) -> Tuple:
                     cards = e.text.split("\n")
                     for i in range(1, len(cards), 4):
                         card_name = cards[i]
-                        card_code = cards[i + 1] + "/" + cards[i + 2]
-                        # workaround for repeated name, TODO: add card code column
-                        if card_name == "カイオーガ" and card_code == "S4a/036/190":
-                            card_name = "AR カイオーガ"
-
-                        card_numbers = int(cards[i + 3][:-1])
-                        pokemon_dict[card_name] = card_numbers
+                        card_code = cards[i + 1] + " " + cards[i + 2]
+                        card_name = card_name + "\n" + card_code
+                        num_cards = int(cards[i + 3][:-1])
+                        pokemon_dict[card_name] = num_cards
                 else:
                     """
                     example:

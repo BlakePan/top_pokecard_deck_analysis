@@ -16,7 +16,7 @@ SIMPLE_CASE = [
     "ミュウツーV-UNION",
     "ロトムVSTAR",
     "クロススイッチャー",
-    "かがやくムゲンダイナ"
+    "かがやくムゲンダイナ",
 ]
 
 
@@ -25,7 +25,7 @@ def find_categories(pokemon_dict: dict, tool_dict: dict, energy_dict: dict) -> s
 
     # Initialize
     categories = []
-    poke_cards = pokemon_dict.keys()
+    poke_cards = [card.split("\n")[0] for card in pokemon_dict.keys()]
     tool_cards = tool_dict.keys()
     energy_cards = energy_dict.keys()
 
@@ -84,6 +84,8 @@ def find_categories(pokemon_dict: dict, tool_dict: dict, energy_dict: dict) -> s
                 categories.append("LTB_ヤミラミ_リザードン")
         if "カイオーガ" in poke_cards:
             categories.append("LTB_カイオーガ")
+        if "カイリューV" in poke_cards:
+            categories.append("LTB_カイリュー")
 
     # "レジ"
     if (
