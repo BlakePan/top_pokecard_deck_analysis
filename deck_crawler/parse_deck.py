@@ -5,6 +5,7 @@ import os
 import re
 import threading
 import time
+import traceback
 import unicodedata
 from typing import Any, Dict, List, Tuple, Union
 
@@ -19,6 +20,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from tqdm import tqdm
 
 from .deck_category_helper import find_categories
+from .translator import map_card_code, translate_jp_to_ch
 
 # Set up logging to a file
 logging.basicConfig(
@@ -101,26 +103,25 @@ def extract_card(cards: List[str]) -> Dict[str, int]:
 
     for card_string in cards[1:]:
         card_string = card_string.split(" ")
+        card_name = card_string[0]
+        num_cards = int(card_string[-1][:-1])
         character_index = -1
         for character in ["（", "("]:
-            if character in card_string[0]:
-                character_index = card_string[0].find(character)
+            if character in card_name:
+                character_index = card_name.find(character)
 
         # if there is a left parenthesis in the card name,
         # then the card name will be modified for removing chars
         # including and after the left parenthesis
         # otherwise, just keep the same card name
-        card_string[0] = (
-            card_string[0][:character_index]
-            if character_index != -1
-            else card_string[0]
-        )
-        extracted_card_info[card_string[0]] = int(card_string[-1][:-1])
+        card_name = card_name[:character_index] if character_index != -1 else card_name
+        # card_name = translate_jp_to_ch(card_name)
+        extracted_card_info[card_name] = num_cards
 
     return extracted_card_info
 
 
-def reassign_category(decks: dict) -> dict:
+def reassign_category(decks: Dict) -> Dict:
     """Reassigns a category to each deck in a dictionary of decks.
 
     The category for each deck is determined by calling the
@@ -139,6 +140,22 @@ def reassign_category(decks: dict) -> dict:
 
     for category in decks.keys():
         for deck in decks[category]:
+            # Check and map card code to one for cards with same effect
+            temp_deck = copy.deepcopy(deck["pokemons"])
+            for pokemon_name in deck["pokemons"].keys():
+                card_name, card_code = pokemon_name.split("\n")
+                mapped_card_code = map_card_code(
+                    translate_jp_to_ch(card_name), card_code
+                )
+                if mapped_card_code != card_code:
+                    card_full_name_org = pokemon_name
+                    card_full_name_new = card_name + "\n" + mapped_card_code
+                    if card_full_name_new not in temp_deck:
+                        temp_deck[card_full_name_new] = 0
+                    temp_deck[card_full_name_new] += temp_deck[card_full_name_org]
+                    temp_deck.pop(card_full_name_org)
+            deck["pokemons"] = temp_deck
+
             assigned_categories = find_categories(
                 deck["pokemons"], deck["tools"], deck["energies"]
             )
@@ -153,7 +170,54 @@ def reassign_category(decks: dict) -> dict:
     return new_decks
 
 
-def parse_deck(deck_code: str = None, deck_link: str = None) -> Tuple:
+def extract_full_cardname(onclick_element: WebElement, upper_driver) -> str:
+    # NOT IN USE, performance is too bad
+    # Get urls
+    onclick_value = onclick_element.get_attribute("onclick")
+    card_id = upper_driver.execute_script(
+        "return {}".format(onclick_value.split("'")[1])
+    )
+    url = (
+        f"https://www.pokemon-card.com/card-search/details.php/card/{card_id}/regu/all"
+    )
+
+    with webdriver.Chrome(options=chrome_options) as driver:
+        # Init driver
+        # driver.implicitly_wait(0.0)  # seconds
+        driver.get(url)
+
+        # Extract card name
+        card_name = driver.find_element(By.CLASS_NAME, "Heading1.mt20").text
+        character_index = -1
+        for character in ["（", "("]:
+            if character in card_name:
+                character_index = card_name.find(character)
+        # if there is a left parenthesis in the card name,
+        # then the card name will be modified for removing chars
+        # including and after the left parenthesis
+        # otherwise, just keep the same card name
+        card_name = card_name[:character_index] if character_index != -1 else card_name
+
+        # Find card code element
+        cardcode_element = driver.find_element(By.CLASS_NAME, "subtext.Text-fjalla")
+
+        # Extract expansion symbol
+        expansion_symbol = cardcode_element.find_element(
+            By.CLASS_NAME, "img-regulation"
+        ).get_attribute("alt")
+
+        # Extract collector number
+        collector_number = cardcode_element.text
+        collector_number = full2half(collector_number)
+        collector_number = collector_number.replace(" ", "")
+
+    return f"{card_name}\n{expansion_symbol} {collector_number}"
+
+
+def parse_deck(
+    deck_code: str = None,
+    deck_link: str = None,
+) -> Tuple:
     """Parses a deck and returns the card information
     as a tuple of dictionaries.
 
@@ -200,8 +264,8 @@ def parse_deck(deck_code: str = None, deck_link: str = None) -> Tuple:
                 By.CLASS_NAME, "Grid_item"
             )
 
-            for e in elems:
-                if "ポケモン (" in e.text:
+            for grid_item_elem in elems:
+                if "ポケモン (" in grid_item_elem.text:
                     """
                     example:
 
@@ -211,13 +275,17 @@ def parse_deck(deck_code: str = None, deck_link: str = None) -> Tuple:
                     253/184
                     3枚
                     """
-                    cards = e.text.split("\n")
+                    cards = grid_item_elem.text.split("\n")
                     for i in range(1, len(cards), 4):
                         card_name = cards[i]
+                        # card_name = translate_jp_to_ch(card_name)
                         card_code = cards[i + 1] + " " + cards[i + 2]
+                        card_code = map_card_code(card_name, card_code)
                         card_name = card_name + "\n" + card_code
                         num_cards = int(cards[i + 3][:-1])
-                        pokemon_dict[card_name] = num_cards
+                        if card_name not in pokemon_dict:
+                            pokemon_dict[card_name] = 0
+                        pokemon_dict[card_name] += num_cards
                 else:
                     """
                     example:
@@ -225,19 +293,22 @@ def parse_deck(deck_code: str = None, deck_link: str = None) -> Tuple:
                     グッズ (19)
                     クイックボール 3枚
                     """
-                    cards = e.text.split("\n")
-                    res = extract_card(cards)
-                    if "グッズ (" in e.text:
-                        tool_dict = res
-                    elif "サポート (" in e.text:
-                        supporter_dict = res
-                    elif "スタジアム (" in e.text:
-                        stadium_dict = res
-                    elif "エネルギー (" in e.text:
-                        energy_dict = res
+                    grid_text = grid_item_elem.text
+                    cards = grid_text.split("\n")
+                    card_info = extract_card(cards)
+
+                    if "グッズ (" in grid_text:
+                        tool_dict = card_info
+                    elif "サポート (" in grid_text:
+                        supporter_dict = card_info
+                    elif "スタジアム (" in grid_text:
+                        stadium_dict = card_info
+                    elif "エネルギー (" in grid_text:
+                        energy_dict = card_info
         except Exception as e:
             logger.info(f"An error occurred while parsing the deck: {e}")
             logger.debug(e)
+            logger.debug(traceback.format_exc())
             return None
 
     return pokemon_dict, tool_dict, supporter_dict, stadium_dict, energy_dict
@@ -624,7 +695,10 @@ def parse_events_from_official(
 if __name__ == "__main__":
     t1 = time.time()
     pokemon_dict, tool_dict, supporter_dict, stadium_dict, energy_dict = parse_deck(
-        deck_link="https://www.pokemon-card.com/deck/confirm.html/deckID/c8G888-na3SQ1-x8aDGc"
+        # # test case: a type of card is 0 (stadium for this case)
+        # deck_link="https://www.pokemon-card.com/deck/confirm.html/deckID/HgLLgN-Erze6p-LQLHNn"
+        # test case: same card has different card code (カイリューV for this case)
+        deck_link="https://www.pokemon-card.com/deck/confirm.html/deckID/nLngLQ-Wn9DHf-9nnQLn"
     )
     t2 = time.time()
     categories = find_categories(pokemon_dict, tool_dict, energy_dict)
