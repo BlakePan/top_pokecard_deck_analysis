@@ -20,7 +20,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from tqdm import tqdm
 
 from .deck_category_helper import find_categories
-from .translator import map_card_code, translate_jp_to_ch
+from .translator import map_card_code
 
 # Set up logging to a file
 logging.basicConfig(
@@ -114,8 +114,9 @@ def extract_card(cards: List[str]) -> Dict[str, int]:
         # then the card name will be modified for removing chars
         # including and after the left parenthesis
         # otherwise, just keep the same card name
-        card_name = card_name[:character_index] if character_index != -1 else card_name
-        # card_name = translate_jp_to_ch(card_name)
+        card_name = (
+            card_name[:character_index] if character_index != -1 else card_name
+        )
         extracted_card_info[card_name] = num_cards
 
     return extracted_card_info
@@ -144,15 +145,15 @@ def reassign_category(decks: Dict) -> Dict:
             temp_deck = copy.deepcopy(deck["pokemons"])
             for pokemon_name in deck["pokemons"].keys():
                 card_name, card_code = pokemon_name.split("\n")
-                mapped_card_code = map_card_code(
-                    translate_jp_to_ch(card_name), card_code
-                )
+                mapped_card_code = map_card_code(card_name, card_code)
                 if mapped_card_code != card_code:
                     card_full_name_org = pokemon_name
                     card_full_name_new = card_name + "\n" + mapped_card_code
                     if card_full_name_new not in temp_deck:
                         temp_deck[card_full_name_new] = 0
-                    temp_deck[card_full_name_new] += temp_deck[card_full_name_org]
+                    temp_deck[card_full_name_new] += temp_deck[
+                        card_full_name_org
+                    ]
                     temp_deck.pop(card_full_name_org)
             deck["pokemons"] = temp_deck
 
@@ -177,9 +178,7 @@ def extract_full_cardname(onclick_element: WebElement, upper_driver) -> str:
     card_id = upper_driver.execute_script(
         "return {}".format(onclick_value.split("'")[1])
     )
-    url = (
-        f"https://www.pokemon-card.com/card-search/details.php/card/{card_id}/regu/all"
-    )
+    url = f"https://www.pokemon-card.com/card-search/details.php/card/{card_id}/regu/all"
 
     with webdriver.Chrome(options=chrome_options) as driver:
         # Init driver
@@ -196,10 +195,14 @@ def extract_full_cardname(onclick_element: WebElement, upper_driver) -> str:
         # then the card name will be modified for removing chars
         # including and after the left parenthesis
         # otherwise, just keep the same card name
-        card_name = card_name[:character_index] if character_index != -1 else card_name
+        card_name = (
+            card_name[:character_index] if character_index != -1 else card_name
+        )
 
         # Find card code element
-        cardcode_element = driver.find_element(By.CLASS_NAME, "subtext.Text-fjalla")
+        cardcode_element = driver.find_element(
+            By.CLASS_NAME, "subtext.Text-fjalla"
+        )
 
         # Extract expansion symbol
         expansion_symbol = cardcode_element.find_element(
@@ -278,7 +281,6 @@ def parse_deck(
                     cards = grid_item_elem.text.split("\n")
                     for i in range(1, len(cards), 4):
                         card_name = cards[i]
-                        # card_name = translate_jp_to_ch(card_name)
                         card_code = cards[i + 1] + " " + cards[i + 2]
                         card_code = map_card_code(card_name, card_code)
                         card_name = card_name + "\n" + card_code
@@ -352,7 +354,13 @@ def crawl_deck_pages(
         logger.debug(f"parse_deck Time diff: {t2-t1}")
 
         if ret is not None:
-            pokemon_dict, tool_dict, supporter_dict, stadium_dict, energy_dict = ret
+            (
+                pokemon_dict,
+                tool_dict,
+                supporter_dict,
+                stadium_dict,
+                energy_dict,
+            ) = ret
         else:
             logger.info(f"parse_deck Fail, {url}")
             return
@@ -373,7 +381,9 @@ def crawl_deck_pages(
             }
         )
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count()) as executor:
+    with concurrent.futures.ThreadPoolExecutor(
+        max_workers=os.cpu_count()
+    ) as executor:
         # Create a task for each deck
         threads = []
         for deck_meta in deck_metas:
@@ -397,7 +407,9 @@ def crawl_deck_pages(
     return results
 
 
-def parse_deck_meta(deck_elem: WebElement, skip_codes: List[str]) -> Dict[str, Any]:
+def parse_deck_meta(
+    deck_elem: WebElement, skip_codes: List[str]
+) -> Dict[str, Any]:
     """Parses metadata for a deck from a WebElement
     representing a deck in a deck list table.
 
@@ -631,14 +643,19 @@ def parse_events_from_official(
 
         result_page_cnt = 0
         event_page_cnt = 0
-        while result_page_cnt < result_page_limit and event_page_cnt < event_page_limit:
+        while (
+            result_page_cnt < result_page_limit
+            and event_page_cnt < event_page_limit
+        ):
             logger.info(f"Processing result page: {result_page_cnt}")
             decks_copy = copy.deepcopy(decks)  # backup
             try:
                 events = driver.find_elements(By.CLASS_NAME, "eventListItem")
                 pbar = tqdm(events)
                 for event in pbar:
-                    pbar.set_description(f"Processing result page: {result_page_cnt}")
+                    pbar.set_description(
+                        f"Processing result page: {result_page_cnt}"
+                    )
                     title = event.find_element(By.CLASS_NAME, "title")
                     if "シティリーグ" in title.text:
                         event_meta = get_event_meta(event)
@@ -694,7 +711,13 @@ def parse_events_from_official(
 
 if __name__ == "__main__":
     t1 = time.time()
-    pokemon_dict, tool_dict, supporter_dict, stadium_dict, energy_dict = parse_deck(
+    (
+        pokemon_dict,
+        tool_dict,
+        supporter_dict,
+        stadium_dict,
+        energy_dict,
+    ) = parse_deck(
         # # test case: a type of card is 0 (stadium for this case)
         # deck_link="https://www.pokemon-card.com/deck/confirm.html/deckID/HgLLgN-Erze6p-LQLHNn"
         # test case: same card has different card code (カイリューV for this case)

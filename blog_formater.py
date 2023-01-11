@@ -1,12 +1,13 @@
 import argparse
+
 import numpy as np
 import pandas as pd
-from deck_crawler.translator import translate_jp_to_ch
-
 
 # Parse the command-line arguments
 parser = argparse.ArgumentParser()
-parser.add_argument("--input", "-i", required=True, help="Path to the input Excel file")
+parser.add_argument(
+    "--input", "-i", required=True, help="Path to the input Excel file"
+)
 parser.add_argument(
     "--output", "-o", default="output.txt", help="Path to the output file"
 )
@@ -53,12 +54,6 @@ for sheet_index, sheet_name in enumerate(sheet_names):
         # print(row)
         for index, content in enumerate(row):
             if index == 0:
-                if "\n" in content:
-                    card_name, card_code = content.split("\n")
-                    card_name = translate_jp_to_ch(card_name)
-                    content = f"{card_name}\n{card_code}"
-                else:
-                    content = translate_jp_to_ch(content)
                 strings.append(f"{content}")
             elif index == 1:
                 strings.append(f"採用率:\t{content}")
@@ -68,6 +63,6 @@ for sheet_index, sheet_name in enumerate(sheet_names):
 
     # Output the strings to a file
     with open(args.output, "a") as f:
-        f.write(sheet_name_ch + "\n\n")
+        f.write("# " + sheet_name_ch + "\n\n")
         for s in strings:
             f.write(s + "\n")
