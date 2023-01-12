@@ -135,3 +135,7 @@ excel/
 deck_db/
 logs/
 .DS_Store
+
+# image files
+*.png
+*.jpg

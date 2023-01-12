@@ -22,11 +22,16 @@ from tqdm import tqdm
 from .deck_category_helper import find_categories
 from .translator import map_card_code
 
+# Create logging folder
+LOG_FOLDER = "logs"
+if not os.path.exists(LOG_FOLDER):
+    os.makedirs(LOG_FOLDER)
+
 # Set up logging to a file
 logging.basicConfig(
     level=logging.DEBUG,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    filename=f"logs/{os.path.basename(__file__)}.log",
+    filename=f"{LOG_FOLDER}/{os.path.basename(__file__)}.log",
     filemode="w",
 )
 logger = logging.getLogger(__name__)

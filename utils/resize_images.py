@@ -1,7 +1,8 @@
-import os
 import argparse
-from tqdm import tqdm
+import os
+
 from PIL import Image
+from tqdm import tqdm
 
 IMAGE_OUTPUT_SIZE = (600, 838)
 
@@ -26,25 +27,19 @@ def resize_images(input_folder, output_folder):
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
 
-    # get the total number of images in the input folder
-    num_images = len(
-        [
-            file
-            for file in os.listdir(input_folder)
-            if file.endswith(".jpg") or file.endswith(".png")
-        ]
-    )
+    # loop through all imgs in the input folder
+    pbar = tqdm(os.listdir(input_folder))
+    for img in pbar:
+        pbar.set_description(f"Resizing: {img}")
 
-    # loop through all files in the input folder
-    for file in tqdm(os.listdir(input_folder), total=num_images):
-        # check if the file is an image
-        if file.endswith(".jpg") or file.endswith(".png"):
+        # check if the img is an image
+        if img.endswith(".jpg") or img.endswith(".png"):
             # open the image
-            image = Image.open(os.path.join(input_folder, file))
+            image = Image.open(os.path.join(input_folder, img))
             # resize the image
             image = image.resize(IMAGE_OUTPUT_SIZE)
             # save the resized image to the output folder
-            image.save(os.path.join(output_folder, file))
+            image.save(os.path.join(output_folder, img))
 
 
 def main():
