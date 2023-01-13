@@ -1,4 +1,5 @@
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -8,8 +9,9 @@ import pandas as pd
 # TODO: workaround for importing
 sys.path.append(str(Path.cwd()))
 
-from utils.download_images import download_images
-from utils.resize_images import resize_images
+from deck_crawler.utils.download_images import download_images
+from deck_crawler.utils.resize_images import resize_images
+from deck_crawler.utils.translator import translate_ch_to_jp
 
 # Set the range of the matrix
 START_ROW = 0
@@ -24,17 +26,25 @@ SHEET_NAMES = [
 ]
 
 DOWNLOAD_IMAGE_FOLDER = Path(__file__).parent / "download_imgs"
-RESIZE_IMAGE_FOLDER = Path(__file__).parent / "resized_imgs"
+MAPPING_FILE_PATH = (
+    Path(__file__).parent.parent / "deck_crawler/assets/card_mapping.json"
+)
 
 
 def format_for_blog(
     input_file_path,
     output_file_path,
+    mapping_file_path,
     is_download_image=False,
     download_image_folder=DOWNLOAD_IMAGE_FOLDER,
     is_resize_image=False,
-    resize_image_folder=RESIZE_IMAGE_FOLDER,
+    resize_image_folder=None,
 ):
+    if not mapping_file_path:
+        mapping_file_path = MAPPING_FILE_PATH
+    with open(mapping_file_path, "r") as f:
+        mapping_dict = json.load(f)
+
     # Create the output file
     with open(output_file_path, "w") as f:
         pass
@@ -70,9 +80,17 @@ def format_for_blog(
                 if index == 0:
                     strings.append(f"{content}")
                     if "\n" in content:
+                        # For pokemon cards
                         card_code = content.split("\n")[-1]
                         card_code_list.append(card_code)
-                        # TODO: add card code for other type of cards
+                    else:
+                        # For other type of cards
+                        jp_card_name = translate_ch_to_jp(content)
+                        if jp_card_name not in mapping_dict:
+                            continue
+                        map_code_list = mapping_dict[jp_card_name]["code_list"]
+                        if map_code_list:
+                            card_code_list += map_code_list[0]
                 elif index == 1:
                     strings.append(f"採用率:\t{content}")
                 elif index == 2:
@@ -91,6 +109,8 @@ def format_for_blog(
 
     # Resize images
     if is_resize_image:
+        if not resize_image_folder:
+            resize_image_folder = Path(output_file_path).parent / "resized_imgs"
         resize_images(download_image_folder, resize_image_folder)
 
 
@@ -110,13 +130,31 @@ def main():
         help="Path to the output file",
     )
     parser.add_argument(
+        "--mapping_file_path",
+        "-m",
+        default=None,
+        help="Path to the mapping file",
+    )
+    parser.add_argument(
         "--download_images", "-d", action="store_true", help="Download images"
     )
     parser.add_argument(
+        "--download_folder",
+        "-df",
+        default=DOWNLOAD_IMAGE_FOLDER,
+        help="Path for download images",
+    )
+    parser.add_argument(
         "--resize_images",
-        "-r",
+        "-rs",
         action="store_true",
         help="Resize downloaded images",
+    )
+    parser.add_argument(
+        "--resize_folder",
+        "-rsf",
+        default=None,
+        help="Path for output resized images",
     )
 
     args = parser.parse_args()
@@ -124,8 +162,11 @@ def main():
     format_for_blog(
         input_file_path=args.input_path,
         output_file_path=args.output_path,
+        mapping_file_path=args.mapping_file_path,
         is_download_image=args.download_images,
         is_resize_image=args.resize_images,
+        download_image_folder=args.download_folder,
+        resize_image_folder=args.resize_folder,
     )
 
 

@@ -6,13 +6,11 @@ import re
 import threading
 import time
 import traceback
-import unicodedata
 from typing import Any, Dict, List, Tuple, Union
 
 from selenium import webdriver
 from selenium.common.exceptions import (NoSuchElementException,
                                         WebDriverException)
-from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support import expected_conditions as EC
@@ -20,7 +18,9 @@ from selenium.webdriver.support.ui import WebDriverWait
 from tqdm import tqdm
 
 from .deck_category_helper import find_categories
-from .translator import map_card_code
+from .utils.chrome_options import chrome_options
+from .utils.font import full2half
+from .utils.translator import map_card_code
 
 # Create logging folder
 LOG_FOLDER = "logs"
@@ -35,42 +35,6 @@ logging.basicConfig(
     filemode="w",
 )
 logger = logging.getLogger(__name__)
-
-
-chrome_options = Options()
-chrome_options.add_argument("--headless")
-chrome_options.add_argument("--start-maximized")
-
-# https://blog.csdn.net/sxf1061700625/article/details/124263680
-# disable images
-chrome_options.add_argument("blink-settings=imagesEnabled=false")
-chrome_options.add_argument("--disable-images")
-# disable javascripts
-chrome_options.add_argument("--disable-javascript")
-chrome_options.add_argument("--disable-plugins")
-chrome_options.add_argument("--disable-dev-shm-usage")
-chrome_options.add_argument("--disable-software-rasterizer")
-chrome_options.add_argument("--disable-extensions")
-chrome_options.add_argument("--disable-gpu")
-chrome_options.add_argument("--disable-java")
-chrome_options.add_argument("--no-sandbox")
-chrome_options.add_argument("--mute-audio")
-chrome_options.add_argument("--single-process")
-chrome_options.add_argument("--disable-blink-features")
-chrome_options.add_argument("--disable-blink-features=AutomationControlled")
-chrome_options.add_argument("--incognito")
-
-
-def full2half(c: str) -> str:
-    """Converts a full-width character to a half-width character.
-
-    Args:
-        c (str): The full-width character to be converted.
-
-    Returns:
-        str: The half-width equivalent of the input character.
-    """
-    return unicodedata.normalize("NFKC", c)
 
 
 def wait_loading_circle(driver, timeout: int = 20):

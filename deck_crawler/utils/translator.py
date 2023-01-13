@@ -3,9 +3,9 @@ import json
 from pathlib import Path
 from typing import Dict
 
-CODE_MAPPING_PATH = Path(__file__).parent / "assets/card_mapping.json"
+CODE_MAPPING_PATH = Path(__file__).parent.parent / "assets/card_mapping.json"
 with open(CODE_MAPPING_PATH, "r") as f:
-    CODE_MAPPING = json.load(f)
+    CODE_MAPPING = json.load(f)  # jp -> ch
 
 
 def translate_jp_to_ch(card_name: str, jp_ch_dict: Dict = CODE_MAPPING) -> str:
@@ -22,6 +22,19 @@ def translate_jp_to_ch(card_name: str, jp_ch_dict: Dict = CODE_MAPPING) -> str:
     """
     if card_name in jp_ch_dict:
         return jp_ch_dict[card_name]["ch_name"]
+    else:
+        return card_name
+
+
+def translate_ch_to_jp(card_name: str, jp_ch_dict: Dict = CODE_MAPPING) -> str:
+    if not "ch_jp_dict" in translate_ch_to_jp.__dict__:
+        translate_ch_to_jp.ch_jp_dict = {}
+        for jp_name, card_info in jp_ch_dict.items():
+            ch_name = card_info["ch_name"]
+            translate_ch_to_jp.ch_jp_dict[ch_name] = jp_name
+
+    if card_name in translate_ch_to_jp.ch_jp_dict:
+        return translate_ch_to_jp.ch_jp_dict[card_name]
     else:
         return card_name
 
