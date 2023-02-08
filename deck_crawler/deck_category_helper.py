@@ -20,7 +20,14 @@ SIMPLE_CASE = [
     "カラマネロVMAX",
     "ダークライVSTAR",
     "そらをとぶピカチュウVMAX",
-    "アローラロコンVSTAR"
+    "アローラロコンVSTAR",
+    "ミライドンex",
+    "サーナイトex",
+    "パフュートンex",
+    "レックウザVMAX",
+    "アルセウスVSTAR",
+    "れんげきウーラオスVMAX",
+    "はくばバドレックスVMAX"
 ]
 
 
@@ -62,7 +69,9 @@ def find_categories(pokemon_dict: dict, tool_dict: dict, energy_dict: dict) -> s
 
     # "ギラティナVSTAR"
     if "ギラティナVSTAR" in poke_cards:
-        if "キュワワー" in poke_cards:
+        if "アルセウスVSTAR" in poke_cards:
+            categories.append("アル_ギラティナVSTAR")
+        elif "キュワワー" in poke_cards or "ジュペッタ" in poke_cards:
             categories.append("LOST_ギラティナVSTAR")
         else:
             categories.append("Other_ギラティナVSTAR")
@@ -72,7 +81,15 @@ def find_categories(pokemon_dict: dict, tool_dict: dict, energy_dict: dict) -> s
         if "ヤミラミ" not in poke_cards:
             categories.append("Other_Lost")
         else:
-            categories.append("LTB")
+            is_other_V = False
+            for pokemon in poke_cards:
+                if "V" in pokemon:
+                    is_other_V = True
+                    break
+            if not is_other_V:
+                categories.append("LTB")
+            else:
+                categories.append("Other_Lost")
 
         if "空の封印石" in tool_cards:
             if "かがやくゲッコウガ" in poke_cards:
@@ -110,6 +127,16 @@ def find_categories(pokemon_dict: dict, tool_dict: dict, energy_dict: dict) -> s
             categories.append("アル_ジュラルドン")
         elif "そらをとぶピカチュウVMAX" in poke_cards:
             categories.append("アル_そらをとぶピカチュウ")
+        elif "はくばバドレックスVMAX" in poke_cards:
+            categories.append("アル_はくばバドレックスVMAX")
+
+        is_other_V = False
+        for pokemon in poke_cards:
+            if "アルセウスV" not in pokemon and "V" in pokemon:
+                is_other_V = True
+                break
+        if not is_other_V:
+            categories.append("純アルセウスVSTAR")
 
     if not categories:
         categories.append("others")
