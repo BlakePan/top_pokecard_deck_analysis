@@ -72,7 +72,7 @@ def extract_card(cards: List[str]) -> Dict[str, int]:
 
     for card_string in cards[1:]:
         card_string = card_string.split(" ")
-        card_name = card_string[0]
+        card_name = " ".join(card_string[0:-1])
         num_cards = int(card_string[-1][:-1])
         character_index = -1
         for character in ["（", "("]:
@@ -689,8 +689,10 @@ if __name__ == "__main__":
     ) = parse_deck(
         # # test case: a type of card is 0 (stadium for this case)
         # deck_link="https://www.pokemon-card.com/deck/confirm.html/deckID/HgLLgN-Erze6p-LQLHNn"
-        # test case: same card has different card code (カイリューV for this case)
-        deck_link="https://www.pokemon-card.com/deck/confirm.html/deckID/nLngLQ-Wn9DHf-9nnQLn"
+        # # test case: same card has different card code (カイリューV for this case)
+        # deck_link="https://www.pokemon-card.com/deck/confirm.html/deckID/nLngLQ-Wn9DHf-9nnQLn"
+        #
+        deck_link="https://www.pokemon-card.com/deck/confirm.html/deckID/FFkkkf-YGaPzV-vw5vVF"
     )
     t2 = time.time()
     categories = find_categories(pokemon_dict, tool_dict, energy_dict)
