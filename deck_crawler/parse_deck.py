@@ -692,7 +692,8 @@ if __name__ == "__main__":
         # # test case: same card has different card code (カイリューV for this case)
         # deck_link="https://www.pokemon-card.com/deck/confirm.html/deckID/nLngLQ-Wn9DHf-9nnQLn"
         #
-        deck_link="https://www.pokemon-card.com/deck/confirm.html/deckID/FFkkkf-YGaPzV-vw5vVF"
+        # deck_link="https://www.pokemon-card.com/deck/confirm.html/deckID/FFkkkf-YGaPzV-vw5vVF"
+        deck_link="https://www.pokemon-card.com/deck/confirm.html/deckID/i6nnLQ-9gJ7JC-gnNnNg"
     )
     t2 = time.time()
     categories = find_categories(pokemon_dict, tool_dict, energy_dict)

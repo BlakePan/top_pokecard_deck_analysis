@@ -24,7 +24,7 @@ SIMPLE_CASE = [
     ("ダークライVSTAR", 2),
     ("そらをとぶピカチュウVMAX", 1),
     ("アローラロコンVSTAR", 2),
-    ("ミライドンex", 3),
+    ("ミライドンex", 2),
     ("サーナイトex", 1),
     ("パフュートンex", 2),
     ("レックウザVMAX", 2),
@@ -32,6 +32,8 @@ SIMPLE_CASE = [
     ("れんげきウーラオスVMAX", 2),
     ("はくばバドレックスVMAX", 2),
     ("レジドラゴVSTAR", 2),
+    ("バシャーモVMAX", 2),
+    ("ヨクバリスVMAX", 2),
 ]
 
 
@@ -44,7 +46,10 @@ def find_categories(
     categories = []
     pokemon_dict_strip_name = {}
     for card_name, num_cards in pokemon_dict.items():
-        pokemon_dict_strip_name[card_name.split("\n")[0]] = num_cards
+        strip_card_name = card_name.split("\n")[0]
+        if strip_card_name not in pokemon_dict_strip_name:
+            pokemon_dict_strip_name[strip_card_name] = 0
+        pokemon_dict_strip_name[strip_card_name] += num_cards
     poke_cards = [card.split("\n")[0] for card in pokemon_dict.keys()]
     tool_cards = tool_dict.keys()
     energy_cards = energy_dict.keys()
@@ -147,6 +152,18 @@ def find_categories(
                 break
         if not is_other_V:
             categories.append("純阿爾VSTAR")
+
+    # "ルギアVSTAR"
+    if "ルギアVSTAR" in poke_cards:
+        if "バンギラスV" in poke_cards or "イシヘンジン" in poke_cards:
+            categories.append("一擊_洛奇亞")
+
+    # "ルギアVSTAR"
+    if "サーナイトex" in poke_cards:
+        if "ザシアンV" in poke_cards:
+            categories.append("沙奈朵_蒼響")
+        if "ミュウツーV-UNION" in poke_cards:
+            categories.append("沙奈朵_超夢V-UNION")
 
     if not categories:
         categories.append("others")
