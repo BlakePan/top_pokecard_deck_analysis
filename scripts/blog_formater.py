@@ -5,11 +5,15 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
 
 # TODO: workaround for importing
 sys.path.append(str(Path.cwd()))
 
-from deck_crawler.utils.download_images import download_images
+from deck_crawler.utils.download_images import (
+    download_images,
+    extract_image_url,
+)
 from deck_crawler.utils.resize_images import resize_images
 from deck_crawler.utils.translator import translate_ch_to_jp
 
@@ -40,14 +44,13 @@ def format_for_blog(
     is_resize_image=False,
     resize_image_folder=None,
 ):
-    if not mapping_file_path:
-        mapping_file_path = MAPPING_FILE_PATH
+    # Open mapping dictionary
     with open(mapping_file_path, "r") as f:
         mapping_dict = json.load(f)
 
     # Create the output file
     with open(output_file_path, "w") as f:
-        pass
+        f.write("# " + Path(input_file_path).stem + "\n\n")
 
     # Init list for containning codes
     card_code_list = []
@@ -74,27 +77,55 @@ def format_for_blog(
 
         # Convert the transposed matrix to a list of strings with newlines
         strings = []
-        for row in transposed_matrix:
-            # print(row)
-            for index, content in enumerate(row):
-                if index == 0:
-                    strings.append(f"{content}")
-                    if "\n" in content:
+        pbar = tqdm(transposed_matrix)
+        for row in pbar:
+            if sheet_name_ch != "能量":
+                # Embedded image block
+                strings.append(
+                    '<div style="float: left; width: 50%;">'
+                )  # column script
+                try:
+                    card_name = row[0]
+                    if "\n" in card_name:
                         # For pokemon cards
-                        card_code = content.split("\n")[-1]
+                        card_code = card_name.split("\n")[-1]
                         card_code_list.append(card_code)
                     else:
                         # For other type of cards
-                        jp_card_name = translate_ch_to_jp(content)
+                        jp_card_name = translate_ch_to_jp(card_name)
                         if jp_card_name not in mapping_dict:
-                            continue
+                            raise ValueError
                         map_code_list = mapping_dict[jp_card_name]["code_list"]
                         if map_code_list:
-                            card_code_list += map_code_list[0]
+                            card_code = map_code_list[0][0]
+                            card_code_list.append(card_code)
+                        else:
+                            card_code = None
+                    image_url = extract_image_url(card_code)
+                except ValueError:
+                    image_url = None
+
+                if image_url:
+                    strings.append(
+                        f'<img src="{image_url}" alt="" width="300" height="400">'
+                    )
+                else:
+                    strings.append("<br>")
+                strings.append("</div>")
+
+            # Statistic data block
+            strings.append(
+                '<div style="float: left; width: 50%;">\n'
+            )  # column script
+            for index, content in enumerate(row):
+                if index == 0:
+                    strings.append(f"{content}<br>")  # write card name
                 elif index == 1:
-                    strings.append(f"採用率:\t{content}")
+                    strings.append(f"採用率:\t{content}<br>")
                 elif index == 2:
-                    strings.append(f"平均採用張數:\t{content}")
+                    strings.append(f"平均採用張數:\t{content}<br>")
+            strings.append("<br><br><br><br><br><br><br><br><br><br><br>")
+            strings.append("</div>")
             strings.append("")
 
         # Output the strings to a file
@@ -126,13 +157,13 @@ def main():
     parser.add_argument(
         "--output_path",
         "-o",
-        default="output.txt",
+        default="output.md",
         help="Path to the output file",
     )
     parser.add_argument(
         "--mapping_file_path",
         "-m",
-        default=None,
+        default=MAPPING_FILE_PATH,
         help="Path to the mapping file",
     )
     parser.add_argument(
