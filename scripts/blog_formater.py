@@ -43,6 +43,7 @@ def format_for_blog(
     download_image_folder=DOWNLOAD_IMAGE_FOLDER,
     is_resize_image=False,
     resize_image_folder=None,
+    embed_image_url=False,
 ):
     # Open mapping dictionary
     with open(mapping_file_path, "r") as f:
@@ -50,7 +51,9 @@ def format_for_blog(
 
     # Create the output file
     with open(output_file_path, "w") as f:
-        f.write("# " + Path(input_file_path).stem + "\n\n")
+        f.write("# " + Path(input_file_path).stem + "\n")
+        f.write(":warning: 如果使用手機建議請橫置閱讀\n")
+        f.write("###### tags: `PTCG` `日本上位構築`\n")
 
     # Init list for containning codes
     card_code_list = []
@@ -65,11 +68,19 @@ def format_for_blog(
         # Determine the dimensions of the matrix
         _, num_cols = df_sheet.shape
         end_col = num_cols
+        num_rows_to_show = df_sheet["date"].isna().sum()
+        end_row = START_ROW + num_rows_to_show
+        idx_to_show = list(range(1, num_rows_to_show + 1))
+        pick_rate_idx = idx_to_show[:len(idx_to_show) // 2]
+        avg_num_use_idx = idx_to_show[len(idx_to_show) // 2:]
+
+        # print(pick_rate_idx)
+        # print(avg_num_use_idx)
 
         # Extract the matrix of values from the
         # DataFrame within a specified range
         column_names = df_sheet.columns.to_numpy()[START_COL:]
-        data = df_sheet.iloc[START_ROW:END_ROW, START_COL:end_col].values
+        data = df_sheet.iloc[START_ROW:end_row, START_COL:end_col].values
         matrix = np.vstack([column_names, data])
 
         # Transpose the matrix using the T attribute of the numpy library
@@ -84,8 +95,8 @@ def format_for_blog(
                 strings.append(
                     '<div style="float: left; width: 50%;">'
                 )  # column script
+                card_name = row[0]
                 try:
-                    card_name = row[0]
                     if "\n" in card_name:
                         # For pokemon cards
                         card_code = card_name.split("\n")[-1]
@@ -101,8 +112,12 @@ def format_for_blog(
                             card_code_list.append(card_code)
                         else:
                             card_code = None
-                    image_url = extract_image_url(card_code)
-                except ValueError:
+                    if embed_image_url:
+                        image_url = extract_image_url(card_code)
+                    else:
+                        image_url = None
+                except (ValueError, IndexError):
+                    print(card_name)
                     image_url = None
 
                 if image_url:
@@ -118,12 +133,19 @@ def format_for_blog(
                 '<div style="float: left; width: 50%;">\n'
             )  # column script
             for index, content in enumerate(row):
+                # print(index)
                 if index == 0:
                     strings.append(f"{content}<br>")  # write card name
-                elif index == 1:
+                if index == pick_rate_idx[0]:
                     strings.append(f"採用率:\t{content}<br>")
-                elif index == 2:
-                    strings.append(f"平均採用張數:\t{content}<br>")
+                    strings.append("採用率每週變化:\n")
+                if index in pick_rate_idx[1:]:
+                    strings[-1] += f"{content} -> "
+                if index == avg_num_use_idx[0]:
+                    strings.append(f"\n平均採用張數\t{content}:<br>")
+                    strings.append("平均採用張數每週變化:\n")
+                if index in avg_num_use_idx[1:]:
+                    strings[-1] += f"{content} -> "
             strings.append("<br><br><br><br><br><br><br><br><br><br><br>")
             strings.append("</div>")
             strings.append("")
@@ -187,6 +209,12 @@ def main():
         default=None,
         help="Path for output resized images",
     )
+    parser.add_argument(
+        "--embed_image_url",
+        "-e",
+        action="store_true",
+        help="Embed image url in output file",
+    )
 
     args = parser.parse_args()
 
@@ -198,6 +226,7 @@ def main():
         is_resize_image=args.resize_images,
         download_image_folder=args.download_folder,
         resize_image_folder=args.resize_folder,
+        embed_image_url=args.embed_image_url,
     )
 
 
