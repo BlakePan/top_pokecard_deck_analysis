@@ -53,6 +53,7 @@ def format_for_blog(
     with open(output_file_path, "w") as f:
         f.write("# " + Path(input_file_path).stem + "\n")
         f.write(":warning: 如果使用手機建議請橫置閱讀\n")
+        f.write(":floppy_disk: [完整資料連結]()\n")
         f.write("###### tags: `PTCG` `日本上位構築`\n")
 
     # Init list for containning codes

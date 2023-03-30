@@ -31,6 +31,12 @@ def extract_image_url(card_code: str) -> str:
     # Calculate page offset
     # 1 page has 20 cards at most
     collector_number = int(collector_number)
+
+    # special cases
+    # s8b has v-union
+    if expansion_symbol == "S8b" and collector_number >= 60:
+        collector_number -= 3
+
     offset = (collector_number - 1) / 20 + 1
     url = (
         "https://asia.pokemon-card.com/tw/card-search/list/"

@@ -165,6 +165,17 @@ def find_categories(
         if "ミュウツーV-UNION" in poke_cards:
             categories.append("沙奈朵_超夢V-UNION")
 
+    if "ミライドンex" in poke_cards and pokemon_dict_strip_name["ミライドンex"] >= 2:
+        if "レジエレキVMAX" in poke_cards and pokemon_dict_strip_name["レジエレキVMAX"] >= 2:
+            if "モココ" not in poke_cards:
+                categories.append("密勒頓ex_電柱")
+            else:
+                categories.append("密勒頓ex_電柱_茸茸羊")
+        elif "モココ" in poke_cards:
+            categories.append("密勒頓ex_茸茸羊")
+        else:
+            categories.append("密勒頓ex_other")
+
     if not categories:
         categories.append("others")
 
