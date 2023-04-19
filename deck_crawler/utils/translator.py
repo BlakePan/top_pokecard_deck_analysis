@@ -89,19 +89,20 @@ def translate_deck(deck: Dict) -> Dict:
         for card in cards.keys():
             # Extract card name and card code
             if "\n" in card:
-                card_name, card_code = card.split("\n")
-                card_code = map_card_code(card_name, card_code)
+                jp_card_name, card_code = card.split("\n")
+                card_code = map_card_code(jp_card_name, card_code)
             else:
-                card_name, card_code = card, None
+                jp_card_name, card_code = card, None
 
             # Translate
-            card_name = translate_jp_to_ch(card_name)
+            ch_card_name = translate_jp_to_ch(jp_card_name)
 
             # Form new card name
+            card_name_new = ch_card_name
+            if ch_card_name != jp_card_name:
+                card_name_new = card_name_new + "\n" + jp_card_name
             if card_code:
-                card_name_new = card_name + "\n" + card_code
-            else:
-                card_name_new = card_name
+                card_name_new = card_name_new + "\n" + card_code
 
             # Update the deck object
             if card_name_new != card:

@@ -34,6 +34,11 @@ SIMPLE_CASE = [
     ("レジドラゴVSTAR", 2),
     ("バシャーモVMAX", 2),
     ("ヨクバリスVMAX", 2),
+    ("パオジアンex", 2),
+    ("ディンルーex", 2),
+    ("マスカーニャex", 2),
+    ("チオンジェンex", 3),
+    ("オンバーンex", 3),
 ]
 
 
@@ -129,15 +134,17 @@ def find_categories(
     if "アルセウスVSTAR" in poke_cards:
         # if "メッソン" in poke_cards:
         #     categories.append("アルセウス裏工作")
-        if "ジュラルドンVMAX" in poke_cards:
+        if "ジュラルドンVMAX" in poke_cards and "ジュラルドンV" in poke_cards:
             categories.append("阿爾_鋁鋼龍VMAX")
-        elif "そらをとぶピカチュウVMAX" in poke_cards:
+        if "そらをとぶピカチュウVMAX" in poke_cards:
             categories.append("阿爾_飛天皮VMAX")
-        elif "はくばバドレックスVMAX" in poke_cards:
+        if "はくばバドレックスVMAX" in poke_cards:
             categories.append("阿爾_白馬VMAX")
-        elif "レジドラゴVSTAR" in poke_cards:
+        if "レジドラゴVSTAR" in poke_cards:
             categories.append("阿爾_雷吉鐸拉戈VSTAR")
-        elif "ギラティナVSTAR" in poke_cards:
+        if "アローラロコンVSTAR" in poke_cards:
+            categories.append("阿爾_阿羅拉六尾VSTAR")
+        if "ギラティナVSTAR" in poke_cards:
             categories.append("阿爾_騎拉帝納VSTAR")
 
         is_other_V = False
@@ -155,15 +162,21 @@ def find_categories(
 
     # "ルギアVSTAR"
     if "ルギアVSTAR" in poke_cards:
-        if "バンギラスV" in poke_cards or "イシヘンジン" in poke_cards:
+        if "いちげきエネルギー" in energy_cards:
             categories.append("一擊_洛奇亞")
+        if "れんげきエネルギー" in energy_cards:
+            categories.append("連擊_洛奇亞")
+        if "いちげきエネルギー" not in energy_cards and "れんげきエネルギー" not in energy_cards:
+            categories.append("純白_洛奇亞")
 
     # "ルギアVSTAR"
     if "サーナイトex" in poke_cards:
-        if "ザシアンV" in poke_cards:
+        if "ザシアンV" in poke_cards and "ミュウツーV-UNION" not in poke_cards:
             categories.append("沙奈朵_蒼響")
-        if "ミュウツーV-UNION" in poke_cards:
+        if "ミュウツーV-UNION" in poke_cards and "ザシアンV" not in poke_cards:
             categories.append("沙奈朵_超夢V-UNION")
+        if "ミュウツーV-UNION" in poke_cards and "ザシアンV" in poke_cards:
+            categories.append("沙奈朵_蒼響_超夢V-UNION")
 
     if "ミライドンex" in poke_cards and pokemon_dict_strip_name["ミライドンex"] >= 2:
         if "レジエレキVMAX" in poke_cards and pokemon_dict_strip_name["レジエレキVMAX"] >= 2:
