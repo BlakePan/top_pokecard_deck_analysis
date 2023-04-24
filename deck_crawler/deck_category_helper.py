@@ -171,6 +171,8 @@ def find_categories(
 
     # "ルギアVSTAR"
     if "サーナイトex" in poke_cards:
+        if "フワンテ" in poke_cards:
+            categories.append("沙奈朵_飄飄球")
         if "ザシアンV" in poke_cards and "ミュウツーV-UNION" not in poke_cards:
             categories.append("沙奈朵_蒼響")
         if "ミュウツーV-UNION" in poke_cards and "ザシアンV" not in poke_cards:

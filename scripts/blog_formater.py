@@ -1,5 +1,6 @@
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -33,6 +34,10 @@ DOWNLOAD_IMAGE_FOLDER = Path(__file__).parent / "download_imgs"
 MAPPING_FILE_PATH = (
     Path(__file__).parent.parent / "deck_crawler/assets/card_mapping.json"
 )
+
+
+def is_alphanumeric(string):
+    return bool(re.match("^[a-zA-Z0-9 /]+$", string))
 
 
 def format_for_blog(
@@ -72,8 +77,8 @@ def format_for_blog(
         num_rows_to_show = df_sheet["date"].isna().sum()
         end_row = START_ROW + num_rows_to_show
         idx_to_show = list(range(1, num_rows_to_show + 1))
-        pick_rate_idx = idx_to_show[:len(idx_to_show) // 2]
-        avg_num_use_idx = idx_to_show[len(idx_to_show) // 2:]
+        pick_rate_idx = idx_to_show[: len(idx_to_show) // 2]
+        avg_num_use_idx = idx_to_show[len(idx_to_show) // 2 :]
 
         # print(pick_rate_idx)
         # print(avg_num_use_idx)
@@ -98,21 +103,25 @@ def format_for_blog(
                 )  # column script
                 card_name = row[0]
                 try:
-                    if "\n" in card_name:
+                    card_name = card_name.split("\n")[-1]
+
+                    if is_alphanumeric(card_name):
                         # For pokemon cards
-                        card_code = card_name.split("\n")[-1]
-                        card_code_list.append(card_code)
+                        card_code = card_name
                     else:
                         # For other type of cards
-                        jp_card_name = translate_ch_to_jp(card_name)
+                        jp_card_name = card_name
                         if jp_card_name not in mapping_dict:
                             raise ValueError
                         map_code_list = mapping_dict[jp_card_name]["code_list"]
                         if map_code_list:
                             card_code = map_code_list[0][0]
-                            card_code_list.append(card_code)
                         else:
                             card_code = None
+
+                    if card_code:
+                        card_code_list.append(card_code)
+
                     if embed_image_url:
                         image_url = extract_image_url(card_code)
                     else:
