@@ -144,7 +144,7 @@ def find_categories(
             categories.append("阿爾_雷吉鐸拉戈VSTAR")
         if "アローラロコンVSTAR" in poke_cards:
             categories.append("阿爾_阿羅拉六尾VSTAR")
-        if "ギラティナVSTAR" in poke_cards:
+        if "ギラティナVSTAR" in poke_cards and "ギラティナV" in poke_cards:
             categories.append("阿爾_騎拉帝納VSTAR")
 
         is_other_V = False

@@ -68,19 +68,37 @@ def extract_image_url(card_code: str) -> str:
     return image_url
 
 
-def download_images(card_code_list, output_folder=IMG_FOLDER):
+def download_images(
+    card_code_list,
+    output_folder=IMG_FOLDER,
+    specified_names=None,
+    exists_ok=False,
+):
     # create the output folder if it doesn't exist
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
 
+    # check specified_names
+    specified_names = specified_names if specified_names else []
+    is_specified_names_ok = isinstance(specified_names, list)
+    if is_specified_names_ok:
+        is_specified_names_ok = len(card_code_list) == len(specified_names)
+        for name in specified_names:
+            if not isinstance(name, str):
+                is_specified_names_ok = False
+                break
+
     pbar = tqdm(card_code_list)
-    for card_code in pbar:
+    for index, card_code in enumerate(pbar):
         try:
             pbar.set_description(f"Downloading: {card_code}")
             image_url = extract_image_url(card_code)
-            file_name = image_url.split("/")[-1]
+            if is_specified_names_ok:
+                file_name = specified_names[index]
+            else:
+                file_name = image_url.split("/")[-1]
             file_path = f"{output_folder}/{file_name}"
-            if not os.path.exists(file_path):
+            if exists_ok or not os.path.exists(file_path):
                 urllib.request.urlretrieve(image_url, file_path)
             else:
                 print(f"{file_name} exists for {card_code}")

@@ -3237,7 +3237,7 @@
         "ch_name": "恐慌面具",
         "code_list": [
             [
-                "S11F 094/100"
+                "S11 094/100"
             ]
         ]
     },
@@ -4180,34 +4180,42 @@
     },
     "基本草エネルギー": {
         "ch_name": "基本草能量",
-        "code_list": []
+        "code_list": [],
+        "image_url": "https://asia.pokemon-card.com/tw/card-img/tw00007839.png"
     },
     "基本炎エネルギー": {
         "ch_name": "基本火能量",
-        "code_list": []
+        "code_list": [],
+        "image_url": "https://asia.pokemon-card.com/tw/card-img/tw00007840.png"
     },
     "基本水エネルギー": {
         "ch_name": "基本水能量",
-        "code_list": []
+        "code_list": [],
+        "image_url": "https://asia.pokemon-card.com/tw/card-img/tw00007841.png"
     },
     "基本雷エネルギー": {
         "ch_name": "基本雷能量",
-        "code_list": []
+        "code_list": [],
+        "image_url": "https://asia.pokemon-card.com/tw/card-img/tw00008111.png"
     },
     "基本超エネルギー": {
         "ch_name": "基本超能量",
-        "code_list": []
+        "code_list": [],
+        "image_url": "https://asia.pokemon-card.com/tw/card-img/tw00007843.png"
     },
     "基本闘エネルギー": {
         "ch_name": "基本鬥能量",
-        "code_list": []
+        "code_list": [],
+        "image_url": "https://asia.pokemon-card.com/tw/card-img/tw00007844.png"
     },
     "基本鋼エネルギー": {
         "ch_name": "基本鋼能量",
-        "code_list": []
+        "code_list": [],
+        "image_url": "https://asia.pokemon-card.com/tw/card-img/tw00007846.png"
     },
     "基本悪エネルギー": {
         "ch_name": "基本惡能量",
-        "code_list": []
+        "code_list": [],
+        "image_url": "https://asia.pokemon-card.com/tw/card-img/tw00007845.png"
     }
 }

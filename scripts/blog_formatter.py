@@ -40,6 +40,10 @@ def is_alphanumeric(string):
     return bool(re.match("^[a-zA-Z0-9 /]+$", string))
 
 
+def is_basic_energy(string):
+    return bool(re.match("基本(草|炎|水|雷|超|闘|鋼|悪)エネルギー", string))
+
+
 def format_for_blog(
     input_file_path,
     output_file_path,
@@ -49,7 +53,13 @@ def format_for_blog(
     is_resize_image=False,
     resize_image_folder=None,
     embed_image_url=False,
+    language="ch",
 ):
+    if language not in ["ch", "jp"]:
+        raise Exception(
+            f"Language not supported: {language}, currently only support 'ch', 'jp'"
+        )
+
     # Open mapping dictionary
     with open(mapping_file_path, "r") as f:
         mapping_dict = json.load(f)
@@ -57,8 +67,14 @@ def format_for_blog(
     # Create the output file
     with open(output_file_path, "w") as f:
         f.write("# " + Path(input_file_path).stem + "\n")
-        f.write(":warning: 如果使用手機建議請橫置閱讀\n")
-        f.write(":floppy_disk: [完整資料連結]()\n")
+        if language == "ch":
+            f.write(":warning: 如果使用手機建議請橫置閱讀\n")
+            f.write(":floppy_disk: [完整資料連結, 僅開放檢視權限](INPUT HERE)\n")
+            f.write(
+                ":flag-tw: [圖片皆取自於台灣寶可夢官網](https://asia.pokemon-card.com/tw/)\n"
+            )
+        else:
+            pass  # TODO: jp
         f.write("###### tags: `PTCG` `日本上位構築`\n")
 
     # Init list for containning codes
@@ -96,15 +112,20 @@ def format_for_blog(
         strings = []
         pbar = tqdm(transposed_matrix)
         for row in pbar:
-            if sheet_name_ch != "能量":
-                # Embedded image block
-                strings.append(
-                    '<div style="float: left; width: 50%;">'
-                )  # column script
-                card_name = row[0]
-                try:
-                    card_name = card_name.split("\n")[-1]
-
+            # Embedded image block
+            strings.append(
+                '<div style="float: left; width: 50%;">'
+            )  # column script
+            card_name = row[0]
+            try:
+                card_name = card_name.split("\n")[-1]
+                if is_basic_energy(card_name):
+                    # For basic energy card
+                    if embed_image_url:
+                        image_url = mapping_dict[card_name]["image_url"]
+                    else:
+                        image_url = None
+                else:
                     if is_alphanumeric(card_name):
                         # For pokemon cards
                         card_code = card_name
@@ -126,34 +147,62 @@ def format_for_blog(
                         image_url = extract_image_url(card_code)
                     else:
                         image_url = None
-                except (ValueError, IndexError):
-                    print(card_name)
-                    image_url = None
+            except (ValueError, IndexError):
+                print(card_name)
+                image_url = None
 
-                if image_url:
-                    strings.append(
-                        f'<img src="{image_url}" alt="" width="300" height="400">'
-                    )
-                else:
-                    strings.append("<br>")
-                strings.append("</div>")
+            if image_url:
+                strings.append(
+                    f'<img src="{image_url}" alt="" width="300" height="400">'
+                )
+            else:
+                strings.append("<br>")
+            strings.append("</div>")
 
             # Statistic data block
             strings.append(
                 '<div style="float: left; width: 50%;">\n'
             )  # column script
             for index, content in enumerate(row):
-                # print(index)
+                # write card name
                 if index == 0:
-                    strings.append(f"{content}<br>")  # write card name
+                    content = content.split("\n")
+                    if len(content) == 3:
+                        ch_card_name, jp_card_name, card_code = content
+                    elif len(content) == 2:
+                        ch_card_name, jp_card_name = content
+                        card_code = ""
+                    else:
+                        ch_card_name, jp_card_name, card_code = (
+                            "Error",
+                            "Error",
+                            "Error",
+                        )
+
+                    if language == "ch":
+                        display_name = ch_card_name + " " + card_code
+                    else:
+                        display_name = jp_card_name + " " + card_code
+
+                    strings.append(f"## {display_name}<br>")
+
+                # write pick rate and diff of pick rate
                 if index == pick_rate_idx[0]:
-                    strings.append(f"採用率:\t{content}<br>")
-                    strings.append("採用率每週變化:\n")
+                    if language == "ch":
+                        strings.append(f"採用率:\t**{content}**<br>")
+                        strings.append("採用率每週變化:\n")
+                    else:
+                        pass  # TODO: jp
                 if index in pick_rate_idx[1:]:
                     strings[-1] += f"{content} -> "
+
+                # write avg pick num and diff of avg pick num
                 if index == avg_num_use_idx[0]:
-                    strings.append(f"\n平均採用張數\t{content}:<br>")
-                    strings.append("平均採用張數每週變化:\n")
+                    if language == "ch":
+                        strings.append(f"\n平均採用張數:\t**{content}**<br>")
+                        strings.append("平均採用張數每週變化:\n")
+                    else:
+                        pass  # TODO: jp
                 if index in avg_num_use_idx[1:]:
                     strings[-1] += f"{content} -> "
             strings.append("<br><br><br><br><br><br><br><br><br><br><br>")
@@ -225,6 +274,12 @@ def main():
         action="store_true",
         help="Embed image url in output file",
     )
+    parser.add_argument(
+        "--language",
+        "-l",
+        default="ch",
+        help="Chose language of this blog, support: [ch, jp]",
+    )
 
     args = parser.parse_args()
 
@@ -237,6 +292,7 @@ def main():
         download_image_folder=args.download_folder,
         resize_image_folder=args.resize_folder,
         embed_image_url=args.embed_image_url,
+        language=args.language,
     )
 
 
