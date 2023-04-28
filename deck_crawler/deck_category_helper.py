@@ -25,7 +25,7 @@ SIMPLE_CASE = [
     ("そらをとぶピカチュウVMAX", 1),
     ("アローラロコンVSTAR", 2),
     ("ミライドンex", 2),
-    ("サーナイトex", 1),
+    ("サーナイトex", 2),
     ("パフュートンex", 2),
     ("レックウザVMAX", 2),
     ("アルセウスVSTAR", 2),
@@ -82,7 +82,7 @@ def find_categories(
             categories.append("幻影索羅亞克")
 
     # "ギラティナVSTAR"
-    if "ギラティナVSTAR" in poke_cards:
+    if "ギラティナV" in poke_cards and "ギラティナVSTAR" in poke_cards:
         if "キュワワー" in poke_cards or "ジュペッタ" in poke_cards:
             categories.append("放逐_騎拉帝納VSTAR")
         else:
@@ -169,8 +169,8 @@ def find_categories(
         if "いちげきエネルギー" not in energy_cards and "れんげきエネルギー" not in energy_cards:
             categories.append("純白_洛奇亞")
 
-    # "ルギアVSTAR"
-    if "サーナイトex" in poke_cards:
+    # "サーナイトex"
+    if "サーナイトex" in poke_cards and pokemon_dict_strip_name["サーナイトex"] >= 2:
         if "フワンテ" in poke_cards:
             categories.append("沙奈朵_飄飄球")
         if "ザシアンV" in poke_cards and "ミュウツーV-UNION" not in poke_cards:
@@ -181,7 +181,10 @@ def find_categories(
             categories.append("沙奈朵_蒼響_超夢V-UNION")
 
     if "ミライドンex" in poke_cards and pokemon_dict_strip_name["ミライドンex"] >= 2:
-        if "レジエレキVMAX" in poke_cards and pokemon_dict_strip_name["レジエレキVMAX"] >= 2:
+        if (
+            "レジエレキVMAX" in poke_cards
+            and pokemon_dict_strip_name["レジエレキVMAX"] >= 2
+        ):
             if "モココ" not in poke_cards:
                 categories.append("密勒頓ex_電柱")
             else:
@@ -190,6 +193,16 @@ def find_categories(
             categories.append("密勒頓ex_茸茸羊")
         else:
             categories.append("密勒頓ex_other")
+
+    if (
+        "ヤミカラス" in poke_cards
+        and pokemon_dict_strip_name["ヤミカラス"] == 4
+        and "カラミンゴ" in poke_cards
+        and pokemon_dict_strip_name["カラミンゴ"] == 4
+        and "カイデン" in poke_cards
+        and pokemon_dict_strip_name["カイデン"] == 4
+    ):
+        categories.append("團結之翼")
 
     if not categories:
         categories.append("others")

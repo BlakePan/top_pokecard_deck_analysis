@@ -33,9 +33,15 @@ def extract_image_url(card_code: str) -> str:
     collector_number = int(collector_number)
 
     # special cases
-    # s8b has v-union
+    # S8b has v-union
     if expansion_symbol == "S8b" and collector_number >= 60:
         collector_number -= 3
+    # S7D, the first card is in wrong place XD
+    if expansion_symbol == "S7D":
+        if collector_number == 56:
+            collector_number = 1
+        else:
+            collector_number += 1
 
     offset = (collector_number - 1) / 20 + 1
     url = (

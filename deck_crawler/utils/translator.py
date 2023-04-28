@@ -113,4 +113,7 @@ def translate_deck(deck: Dict) -> Dict:
 
         translated_deck[translate_field] = temp_dict
 
+    # Strip japnese week symbol
+    translated_deck["date"] = translated_deck["date"][:-3]
+
     return translated_deck
