@@ -39,6 +39,25 @@ def translate_ch_to_jp(card_name: str, jp_ch_dict: Dict = CODE_MAPPING) -> str:
         return card_name
 
 
+def map_card_name(
+    card_code: str, language: str, mapping_dict: Dict = CODE_MAPPING
+):
+    if not "code_name_dict" in map_card_name.__dict__:
+        map_card_name.code_name_dict = {}
+        for jp_name, card_info in mapping_dict.items():
+            ch_name = card_info["ch_name"]
+            code_list = card_info["code_list"]
+            for codes in code_list:
+                map_card_name.code_name_dict[codes[0]] = {}
+                map_card_name.code_name_dict[codes[0]]["ch"] = ch_name
+                map_card_name.code_name_dict[codes[0]]["jp"] = jp_name
+
+    if card_code in map_card_name.code_name_dict:
+        return map_card_name.code_name_dict[card_code][language]
+    else:
+        return card_code
+
+
 def map_card_code(
     card_name: str, card_code: str, mapping_dict: Dict = CODE_MAPPING
 ) -> str:
